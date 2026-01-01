@@ -1,0 +1,11 @@
+[project]
+name = "synthetic-data-genration"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["torch ",
+"marker-pdf",
+"streamlit",
+"streamlit-ace",
+"chonkie","fastapi[standard]","motor","pymongo"]
