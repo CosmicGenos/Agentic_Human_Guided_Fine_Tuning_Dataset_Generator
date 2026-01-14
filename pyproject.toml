@@ -8,4 +8,4 @@ dependencies = ["torch ",
 "marker-pdf",
 "streamlit",
 "streamlit-ace",
-"chonkie","fastapi[standard]","motor","pymongo"]
+"chonkie","fastapi[standard]","motor","pymongo","beanie"]
