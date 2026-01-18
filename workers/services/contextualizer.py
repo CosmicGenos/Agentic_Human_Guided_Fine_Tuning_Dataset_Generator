@@ -36,26 +36,57 @@ class Contextualizer:
         child_chunks: List[ChildChunk],
         book_metadata: dict
     ) -> List[ContextualizedChildChunk]:
-       
+        """
+        Contextualize child chunks using their parent context.
+        Each child is contextualized based on its parent chunk.
+        Chunks in overlap zones are contextualized multiple times.
+        
+        Args:
+            context_chunks: Parent chunks (30k tokens)
+            child_chunks: Child chunks (800 tokens)
+            book_metadata: Book title, author, etc.
+            
+        Returns:
+            List of ContextualizedChildChunk objects
+        """
         logger.info(
             f"Starting hierarchical contextualization: "
             f"{len(context_chunks)} parents, {len(child_chunks)} children"
         )
         
+        # Create index for O(1) child lookup (50x faster than filtering)
+        child_by_index = {child.index: child for child in child_chunks}
+        logger.debug(f"Created child index with {len(child_by_index)} entries")
+        
         tasks = []
+        empty_parents = 0
+        missing_children_count = 0
         
         for context_chunk in context_chunks:
-
-            children_for_context = [
-                child for child in child_chunks 
-                if child.parent_context_id == context_chunk.context_id
-            ]
+            # Use pre-computed child_indices from parent (already set by ChunkingService)
+            children = []
+            for idx in context_chunk.child_indices:
+                if idx not in child_by_index:
+                    logger.warning(
+                        f"Child index {idx} not found in child_chunks for parent {context_chunk.context_id}. "
+                        "This may indicate data corruption or mismatched inputs."
+                    )
+                    missing_children_count += 1
+                    continue
+                children.append(child_by_index[idx])
             
-            if not children_for_context:
+            # Check for empty children
+            if not children:
+                logger.warning(
+                    f"Parent context {context_chunk.context_id} has no children. "
+                    f"Expected indices: {context_chunk.child_indices}"
+                )
+                empty_parents += 1
                 continue
             
-            for i in range(0, len(children_for_context), self.max_chunks_per_batch):
-                batch = children_for_context[i:i + self.max_chunks_per_batch]
+            # Batch children for this parent
+            for i in range(0, len(children), self.max_chunks_per_batch):
+                batch = children[i:i + self.max_chunks_per_batch]
                 
                 task = self._contextualize_batch_with_retry(
                     parent_text=context_chunk.text,
@@ -64,6 +95,11 @@ class Contextualizer:
                     book_metadata=book_metadata
                 )
                 tasks.append(task)
+        
+        if empty_parents > 0:
+            logger.warning(f"Found {empty_parents} parents with no children")
+        if missing_children_count > 0:
+            logger.warning(f"Found {missing_children_count} missing child references")
         
         logger.info(f"Created {len(tasks)} batches for parallel processing")
         

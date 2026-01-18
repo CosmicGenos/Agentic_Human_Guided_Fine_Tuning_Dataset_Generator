@@ -8,12 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 class ChunkingService:
-    """
-    Hierarchical chunking service using Chonkie.
-    Creates two levels:
-    - Parent chunks (30k tokens) for LLM contextualization
-    - Child chunks (800 tokens) for retrieval/embedding
-    """
     
     def __init__(
         self,
@@ -120,7 +114,6 @@ class ChunkingService:
         return chunks
     
     def get_chunker_metadata(self) -> dict:
-        """Get metadata about chunking configuration"""
         return {
             "service": "hierarchical_chonkie",
             "parent": {

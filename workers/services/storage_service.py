@@ -1,6 +1,3 @@
-"""
-Service for storing vectors and metadata in Qdrant.
-"""
 
 from typing import List
 from qdrant_client import QdrantClient
@@ -22,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 
 class StorageService:
-    """Service for storing chunks in Qdrant"""
     
     def __init__(self):
         self.client = QdrantClient(url=Config.QDRANT_URL)
@@ -33,12 +29,7 @@ class StorageService:
         logger.info(f"Initialized storage service, Qdrant URL: {Config.QDRANT_URL}")
     
     async def ensure_collection_exists(self, collection_name: str):
-        """
-        Ensure Qdrant collection exists with proper configuration.
-        
-        Args:
-            collection_name: Name of collection to create/verify
-        """
+
         try:
             # Check if collection exists
             collections = self.client.get_collections().collections
@@ -47,7 +38,6 @@ class StorageService:
             if not exists:
                 logger.info(f"Creating Qdrant collection: {collection_name}")
                 
-                # Create collection with both dense and sparse vectors
                 self.client.create_collection(
                     collection_name=collection_name,
                     vectors_config={
@@ -59,9 +49,9 @@ class StorageService:
                     sparse_vectors_config={
                         "sparse": SparseVectorParams(
                             index=SparseIndexParams(
-                                on_disk=False  # Keep in memory for speed
+                                on_disk=False  
                             ),
-                            modifier=Modifier.IDF  # Use IDF for BM25-like scoring
+                            modifier=Modifier.IDF  
                         )
                     }
                 )
@@ -84,30 +74,14 @@ class StorageService:
         book_metadata: dict = None,
         data_category: str = "fiction"
     ) -> List[str]:
-        """
-        Store chunks with dense and sparse vectors in Qdrant.
         
-        Args:
-            chunks: List of contextualized child chunks
-            dense_vectors: List of dense embedding vectors
-            sparse_vectors: List of sparse BM25 vectors
-            document_id: Document ID
-            project_id: Project ID
-            book_metadata: Optional book metadata
-            data_category: "fiction" or "academic"
-            
-        Returns:
-            List of Qdrant point IDs
-        """
         collection_name = (
             self.fiction_collection if data_category == "fiction"
             else self.academic_collection
         )
-        
-        # Ensure collection exists
+ 
         await self.ensure_collection_exists(collection_name)
-        
-        # Validate inputs
+
         if not (len(chunks) == len(dense_vectors) == len(sparse_vectors)):
             raise ValueError(
                 f"Mismatched lengths: {len(chunks)} chunks, "
@@ -115,18 +89,15 @@ class StorageService:
                 f"{len(sparse_vectors)} sparse vectors"
             )
         
-        # Build points
         points = []
         point_ids = []
         
         for idx, (chunk, dense_vec, sparse_vec) in enumerate(
             zip(chunks, dense_vectors, sparse_vectors)
         ):
-            # Generate unique point ID
             point_id = str(uuid.uuid4())
             point_ids.append(point_id)
-            
-            # Build payload with hierarchical chunk structure
+
             payload = {
                 "original_text": chunk.original_text,
                 "context_description": chunk.context_description,
@@ -141,11 +112,9 @@ class StorageService:
                 "metadata": chunk.metadata or {}
             }
             
-            # Add book metadata if provided
             if book_metadata:
                 payload["book_metadata"] = book_metadata
             
-            # Create point
             point = PointStruct(
                 id=point_id,
                 vector={
@@ -160,7 +129,6 @@ class StorageService:
             
             points.append(point)
         
-        # Upload to Qdrant
         logger.info(f"Uploading {len(points)} points to Qdrant collection {collection_name}")
         
         self.client.upsert(
@@ -177,13 +145,7 @@ class StorageService:
         document_id: str,
         data_category: str = "fiction"
     ):
-        """
-        Delete all chunks for a document.
         
-        Args:
-            document_id: Document ID
-            data_category: "fiction" or "academic"
-        """
         collection_name = (
             self.fiction_collection if data_category == "fiction"
             else self.academic_collection

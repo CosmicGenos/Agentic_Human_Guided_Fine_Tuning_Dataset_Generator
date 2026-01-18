@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 class EmbeddingService:
-    """Service for generating text embeddings"""
     
     def __init__(self):
         self.client = AsyncOpenAI(api_key=Config.OPENAI_API_KEY)
@@ -22,16 +21,7 @@ class EmbeddingService:
         logger.info(f"Initialized embedding service with model {self.model}")
     
     async def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
-        """
-        Generate embeddings for a list of texts.
-        Automatically batches requests.
         
-        Args:
-            texts: List of texts to embed
-            
-        Returns:
-            List of embedding vectors
-        """
         all_embeddings = []
         
         # Process in batches
@@ -53,15 +43,7 @@ class EmbeddingService:
         return all_embeddings
     
     async def generate_single_embedding(self, text: str) -> List[float]:
-        """
-        Generate embedding for a single text.
-        
-        Args:
-            text: Text to embed
-            
-        Returns:
-            Embedding vector
-        """
+
         response = await self.client.embeddings.create(
             model=self.model,
             input=[text]
