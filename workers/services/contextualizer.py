@@ -5,7 +5,9 @@ Service for contextualizing chunks using LLM.
 import asyncio
 from typing import List
 from openai import AsyncOpenAI
-from workers.models import Chunk, ContextualizedChunk, ContextualOutput, Chapter
+from workers.models import (
+ ContextualOutput,ContextChunk, ChildChunk, ContextualizedChildChunk
+)
 from workers.config import Config
 import tiktoken
 import logging
@@ -28,131 +30,70 @@ class Contextualizer:
         
         logger.info(f"Initialized contextualizer with model {self.model}, max concurrent: {self.max_concurrent}")
     
-    async def contextualize_chapters(
+    async def contextualize_hierarchical(
         self,
-        chapters: List[Chapter],
-        all_chunks: List[Chunk],
-        book_metadata: dict = None
-    ) -> List[ContextualizedChunk]:
+        context_chunks: List[ContextChunk],
+        child_chunks: List[ChildChunk],
+        book_metadata: dict
+    ) -> List[ContextualizedChildChunk]:
        
-        chapter_chunks_map = self._map_chunks_to_chapters(chapters, all_chunks)
+        logger.info(
+            f"Starting hierarchical contextualization: "
+            f"{len(context_chunks)} parents, {len(child_chunks)} children"
+        )
         
-        # Create tasks for each chapter
         tasks = []
-        for chapter in chapters:
-            chunks_for_chapter = chapter_chunks_map.get(chapter.chapter_number, [])
-            if not chunks_for_chapter:
+        
+        for context_chunk in context_chunks:
+
+            children_for_context = [
+                child for child in child_chunks 
+                if child.parent_context_id == context_chunk.context_id
+            ]
+            
+            if not children_for_context:
                 continue
             
-            task = self._contextualize_chapter(
-                chapter=chapter,
-                chunks=chunks_for_chapter,
-                book_metadata=book_metadata
-            )
-            tasks.append(task)
+            for i in range(0, len(children_for_context), self.max_chunks_per_batch):
+                batch = children_for_context[i:i + self.max_chunks_per_batch]
+                
+                task = self._contextualize_batch_with_retry(
+                    parent_text=context_chunk.text,
+                    children=batch,
+                    context_id=context_chunk.context_id,
+                    book_metadata=book_metadata
+                )
+                tasks.append(task)
         
-        # Run in parallel with semaphore limiting concurrency
-        logger.info(f"Processing {len(tasks)} chapters in parallel (max {self.max_concurrent} concurrent)")
+        logger.info(f"Created {len(tasks)} batches for parallel processing")
+        
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
-        # Flatten results and handle errors
-        contextualized_chunks = []
+        all_contextualized = []
         for idx, result in enumerate(results):
             if isinstance(result, Exception):
-                logger.error(f"Chapter {chapters[idx].chapter_number} failed: {str(result)}")
-                # Use original chunks as fallback
-                chunks_for_chapter = chapter_chunks_map.get(chapters[idx].chapter_number, [])
-                for chunk in chunks_for_chapter:
-                    contextualized_chunks.append(ContextualizedChunk(
-                        index=chunk.index,
-                        original_text=chunk.text,
-                        contextualized_text=chunk.text,  # Fallback: use original
-                        metadata=chunk.metadata
-                    ))
-            else:
-                contextualized_chunks.extend(result)
+                logger.error(f"Batch {idx} failed: {str(result)}")
+                continue
+            all_contextualized.extend(result)
         
-        # Sort by index
-        contextualized_chunks.sort(key=lambda x: x.index)
-        
-        logger.info(f"Contextualized {len(contextualized_chunks)} chunks total")
-        return contextualized_chunks
-    
-    async def _contextualize_chapter(
-        self,
-        chapter: Chapter,
-        chunks: List[Chunk],
-        book_metadata: dict = None
-    ) -> List[ContextualizedChunk]:
-        """
-        Contextualize chunks for a single chapter.
-        Batches chunks if chapter has many chunks.
-        
-        Args:
-            chapter: Chapter object
-            chunks: Chunks belonging to this chapter
-            book_metadata: Optional book metadata
-            
-        Returns:
-            List of ContextualizedChunk objects
-        """
-        # Check if chapter fits in context window
-        if chapter.token_count > self.max_context_tokens:
-            logger.warning(
-                f"Chapter {chapter.chapter_number} ({chapter.token_count} tokens) "
-                f"exceeds max context ({self.max_context_tokens}). Splitting..."
-            )
-            # TODO: Implement chapter splitting
-            # For now, truncate
-            pass
-        
-        # Batch chunks if too many
-        contextualized_chunks = []
-        for i in range(0, len(chunks), self.max_chunks_per_batch):
-            batch = chunks[i:i + self.max_chunks_per_batch]
-            
-            batch_result = await self._contextualize_batch_with_retry(
-                chapter_text=chapter.text,
-                chunks=batch,
-                chapter_number=chapter.chapter_number,
-                chapter_title=chapter.title,
-                book_metadata=book_metadata
-            )
-            
-            contextualized_chunks.extend(batch_result)
-        
-        return contextualized_chunks
+        logger.info(f"Contextualized {len(all_contextualized)} chunks total")
+        return all_contextualized
     
     async def _contextualize_batch_with_retry(
         self,
-        chapter_text: str,
-        chunks: List[Chunk],
-        chapter_number: int,
-        chapter_title: str = None,
-        book_metadata: dict = None,
+        parent_text: str,
+        children: List[ChildChunk],
+        context_id: int,
+        book_metadata: dict,
         max_retries: int = 3
-    ) -> List[ContextualizedChunk]:
-        """
-        Contextualize a batch of chunks with retry logic.
+    ) -> List[ContextualizedChildChunk]:
         
-        Args:
-            chapter_text: Full chapter text (context)
-            chunks: List of chunks to contextualize
-            chapter_number: Chapter number
-            chapter_title: Optional chapter title
-            book_metadata: Optional book metadata
-            max_retries: Maximum retry attempts
-            
-        Returns:
-            List of ContextualizedChunk objects
-        """
         for attempt in range(max_retries):
             try:
                 return await self._contextualize_batch(
-                    chapter_text=chapter_text,
-                    chunks=chunks,
-                    chapter_number=chapter_number,
-                    chapter_title=chapter_title,
+                    parent_text=parent_text,
+                    children=children,
+                    context_id=context_id,
                     book_metadata=book_metadata
                 )
             except Exception as e:
@@ -163,50 +104,29 @@ class Contextualizer:
                     wait_time = 2 ** attempt  # Exponential backoff
                     await asyncio.sleep(wait_time)
                 else:
-                    logger.error(f"All retry attempts failed for chapter {chapter_number}")
+                    logger.error(f"All retry attempts failed for context {context_id}")
                     raise
     
     async def _contextualize_batch(
         self,
-        chapter_text: str,
-        chunks: List[Chunk],
-        chapter_number: int,
-        chapter_title: str = None,
-        book_metadata: dict = None
-    ) -> List[ContextualizedChunk]:
-        """
-        Contextualize a batch of chunks using LLM.
-        Uses semaphore to limit concurrent API calls.
+        parent_text: str,
+        children: List[ChildChunk],
+        context_id: int,
+        book_metadata: dict
+    ) -> List[ContextualizedChildChunk]:
         
-        Args:
-            chapter_text: Full chapter text (context)
-            chunks: List of chunks to contextualize
-            chapter_number: Chapter number
-            chapter_title: Optional chapter title
-            book_metadata: Optional book metadata
-            
-        Returns:
-            List of ContextualizedChunk objects
-        """
-        # Build prompt
-        prompt = self._build_prompt(
-            chapter_text=chapter_text,
-            chunks=chunks,
-            chapter_number=chapter_number,
-            chapter_title=chapter_title,
-            book_metadata=book_metadata
-        )
+        prompt = self._build_hierarchical_prompt(parent_text, children, book_metadata)
         
         # Call LLM with semaphore
         async with self.semaphore:
-            logger.info(f"Sending {len(chunks)} chunks for contextualization (Chapter {chapter_number})")
+            logger.info(f"Sending {len(children)} chunks for contextualization (Context {context_id})")
             
             response = await self.client.beta.chat.completions.parse(
                 model=self.model,
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a helpful assistant that adds context to text chunks."
+                        "content": "You generate concise context descriptions for text chunks."
                     },
                     {
                         "role": "user",
@@ -219,97 +139,71 @@ class Contextualizer:
             
             result = response.choices[0].message.parsed
         
-        # Validate output
-        if len(result.contextual_chunks) != len(chunks):
+        if len(result.contextual_chunks) != len(children):
             logger.warning(
-                f"LLM returned {len(result.contextual_chunks)} chunks, expected {len(chunks)}. "
-                "Filling missing with original text."
+                f"LLM returned {len(result.contextual_chunks)} descriptions, expected {len(children)}. "
+                "Padding with default descriptions."
             )
-            # Pad with original text
-            while len(result.contextual_chunks) < len(chunks):
-                result.contextual_chunks.append(chunks[len(result.contextual_chunks)].text)
+            while len(result.contextual_chunks) < len(children):
+                result.contextual_chunks.append("Context not available.")
         
-        # Create ContextualizedChunk objects
         contextualized = []
-        for idx, chunk in enumerate(chunks):
-            contextualized.append(ContextualizedChunk(
-                index=chunk.index,
-                original_text=chunk.text,
-                contextualized_text=result.contextual_chunks[idx],
-                metadata={
-                    **(chunk.metadata or {}),
-                    "chapter": chapter_number,
-                    "chapter_title": chapter_title
-                }
+        for idx, child in enumerate(children):
+            context_desc = result.contextual_chunks[idx]
+            combined = f"{context_desc}\n\n{child.original_text}"
+            
+            contextualized.append(ContextualizedChildChunk(
+                index=child.index,
+                parent_context_id=child.parent_context_id,
+                original_text=child.original_text,
+                context_description=context_desc,
+                combined_text=combined,
+                start_index=child.start_index,
+                end_index=child.end_index,
+                token_count=child.token_count,
+                metadata=book_metadata
             ))
         
         return contextualized
     
-    def _build_prompt(
+    def _build_hierarchical_prompt(
         self,
-        chapter_text: str,
-        chunks: List[Chunk],
-        chapter_number: int,
-        chapter_title: str = None,
-        book_metadata: dict = None
+        parent_text: str,
+        children: List[ChildChunk],
+        book_metadata: dict
     ) -> str:
-        """Build prompt for LLM contextualization"""
         
-        book_info = ""
-        if book_metadata:
-            book_info = f"\nBook: {book_metadata.get('title', 'Unknown')}"
-            if 'author' in book_metadata:
-                book_info += f" by {book_metadata['author']}"
+        book_name = book_metadata.get('title', 'Unknown')
+        author = book_metadata.get('author', '')
         
-        chapter_info = f"Chapter {chapter_number}"
-        if chapter_title:
-            chapter_info += f": {chapter_title}"
+        book_info = f"Book: {book_name}"
+        if author:
+            book_info += f" by {author}"
         
-        # Build chunks section
         chunks_text = "\n\n".join([
-            f"Chunk {idx + 1}:\n{chunk.text}"
-            for idx, chunk in enumerate(chunks)
+            f"Chunk {idx + 1}:\n{child.original_text}"
+            for idx, child in enumerate(children)
         ])
         
-        prompt = f"""You are analyzing a section of text.{book_info}
-{chapter_info}
+        max_parent_chars = min(len(parent_text), 15000)
+        
+        prompt = f"""{book_info}
 
-<context>
-{chapter_text[:10000]}...
-</context>
+<parent_context>
+{parent_text[:max_parent_chars]}{"..." if len(parent_text) > max_parent_chars else ""}
+</parent_context>
 
-<chunks>
+<child_chunks>
 {chunks_text}
-</chunks>
+</child_chunks>
 
-For each chunk, provide a brief contextualized version that includes:
-- What part of the narrative this is from
-- Key themes, characters, or events present
-- How it relates to the surrounding context
+For each child chunk, generate a concise context description ({Config.CONTEXT_DESCRIPTION_MIN_TOKENS}-{Config.CONTEXT_DESCRIPTION_MAX_TOKENS} tokens) that:
+- Identifies what part of the narrative/content this is
+- Mentions key themes, characters, or concepts present
+- Relates it to the parent context
 
-Output a JSON object with a list called "contextual_chunks" containing the contextualized versions in the same order.
-Each contextualized chunk should be 1-2 sentences prepended to the original chunk text for better retrieval."""
+IMPORTANT: Return ONLY the context descriptions, NOT the original chunk text.
+Output a JSON object with "contextual_chunks" array containing the descriptions in the same order.
+Each description will be prepended to the original chunk text for better retrieval."""
         
         return prompt
-    
-    def _map_chunks_to_chapters(
-        self,
-        chapters: List[Chapter],
-        chunks: List[Chunk]
-    ) -> dict:
-        """
-        Map chunks to their respective chapters based on character positions.
-        
-        Returns:
-            Dictionary mapping chapter_number -> List[Chunk]
-        """
-        chapter_chunks_map = {ch.chapter_number: [] for ch in chapters}
-        
-        for chunk in chunks:
-            # Find which chapter this chunk belongs to
-            for chapter in chapters:
-                if chapter.start_char <= chunk.start_char < chapter.end_char:
-                    chapter_chunks_map[chapter.chapter_number].append(chunk)
-                    break
-        
-        return chapter_chunks_map

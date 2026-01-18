@@ -13,7 +13,7 @@ from qdrant_client.models import (
     SparseVector as QdrantSparseVector,
     Modifier
 )
-from workers.models import ContextualizedChunk, SparseVector
+from workers.models import ContextualizedChunk, ContextualizedChildChunk, SparseVector
 from workers.config import Config
 import logging
 import uuid
@@ -76,7 +76,7 @@ class StorageService:
     
     async def store_chunks(
         self,
-        chunks: List[ContextualizedChunk],
+        chunks: List[ContextualizedChildChunk],
         dense_vectors: List[List[float]],
         sparse_vectors: List[SparseVector],
         document_id: str,
@@ -88,7 +88,7 @@ class StorageService:
         Store chunks with dense and sparse vectors in Qdrant.
         
         Args:
-            chunks: List of contextualized chunks
+            chunks: List of contextualized child chunks
             dense_vectors: List of dense embedding vectors
             sparse_vectors: List of sparse BM25 vectors
             document_id: Document ID
@@ -126,13 +126,18 @@ class StorageService:
             point_id = str(uuid.uuid4())
             point_ids.append(point_id)
             
-            # Build payload
+            # Build payload with hierarchical chunk structure
             payload = {
                 "original_text": chunk.original_text,
-                "contextualized_text": chunk.contextualized_text,
+                "context_description": chunk.context_description,
+                "combined_text": chunk.combined_text,
                 "document_id": document_id,
                 "project_id": project_id,
                 "chunk_index": chunk.index,
+                "parent_context_id": chunk.parent_context_id,
+                "start_index": chunk.start_index,
+                "end_index": chunk.end_index,
+                "token_count": chunk.token_count,
                 "metadata": chunk.metadata or {}
             }
             

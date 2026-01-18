@@ -23,17 +23,29 @@ class Config:
     
     # ========== Chunking Configuration ==========
     CHUNKER_TYPE = ChunkerType.LLAMA_INDEX_SENTENCE
-    CHUNK_SIZE = 1024  # tokens
-    CHUNK_OVERLAP = 128  # tokens
+    CHUNK_SIZE = 1024  # tokens (deprecated - use hierarchical chunking)
+    CHUNK_OVERLAP = 128  # tokens (deprecated - use hierarchical chunking)
+    
+    # ========== Hierarchical Chunking (Chonkie) ==========
+    PARENT_CHUNK_SIZE = 30000  # tokens - context window for LLM
+    PARENT_CHUNK_OVERLAP = 5000  # tokens - overlap between parent chunks
+    CHILD_CHUNK_SIZE = 800  # tokens - retrieval chunks
+    CHILD_CHUNK_OVERLAP = 100  # tokens - overlap between child chunks
+    CHONKIE_TOKENIZER = "o200k_harmony"  # tokenizer for Chonkie
+    CHONKIE_MIN_SENTENCES = 1  # minimum sentences per chunk
     
     # ========== Contextual Embedding Configuration ==========
     LLM_MODEL = "gpt-4o-mini"
     LLM_TEMPERATURE = 0.0
     LLM_MAX_CONTEXT_TOKENS = 100_000  # GPT-4o-mini context window
-    LLM_TARGET_SECTION_TOKENS = 50_000  # Target size for context sections
+    LLM_TARGET_SECTION_TOKENS = 50_000  # Target size for context sections (deprecated)
     LLM_MAX_CHUNKS_PER_BATCH = 30
-    LLM_MAX_OUTPUT_TOKENS_PER_CHUNK = 100
+    LLM_MAX_OUTPUT_TOKENS_PER_CHUNK = 100  # deprecated - use context description limits
     LLM_MAX_CONCURRENT_CALLS = 10  # Semaphore limit
+    
+    # Context description limits (prepended to original chunk)
+    CONTEXT_DESCRIPTION_MIN_TOKENS = 50
+    CONTEXT_DESCRIPTION_MAX_TOKENS = 200
     
     # ========== Embedding Configuration ==========
     EMBEDDING_MODEL = "text-embedding-3-large"
@@ -52,7 +64,8 @@ class Config:
     MAX_RETRIES = 3
     RETRY_BACKOFF_BASE = 2  # Exponential backoff: 2^attempt seconds
     
-    # ========== Chapter Detection Configuration ==========
+    # ========== Chapter Detection Configuration (DEPRECATED) ==========
+    # NOTE: Chapter detection is deprecated in favor of hierarchical chunking
     CHAPTER_PATTERNS = [
         r"^Chapter \d+",
         r"^CHAPTER \d+",

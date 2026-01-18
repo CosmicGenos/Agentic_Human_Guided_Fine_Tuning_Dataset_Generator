@@ -2,7 +2,6 @@
 from workers.models import TaskDocument
 from workers.services.file_fetcher import FileFetcherService
 from workers.services.text_extractor import TextExtractorService
-from workers.services.chapter_detector import ChapterDetectorService
 from workers.services.chunking_service import ChunkingService
 from workers.services.contextualizer import Contextualizer
 from workers.services.embedding_service import EmbeddingService
@@ -21,7 +20,6 @@ class FictionProcessor:
     def __init__(self):
         self.file_fetcher = FileFetcherService()
         self.text_extractor = TextExtractorService()
-        self.chapter_detector = ChapterDetectorService()
         self.chunking_service = ChunkingService()
         self.contextualizer = Contextualizer()
         self.embedding_service = EmbeddingService()
@@ -64,19 +62,14 @@ class FictionProcessor:
             if not extracted_text.strip():
                 raise ValueError("Extracted text is empty")
             
-            # ===== 3. Detect Chapters =====
-            logger.info(f"[{document_id}] Stage: {ProcessingStage.DETECTING_CHAPTERS.value}")
-            current_stage = ProcessingStage.DETECTING_CHAPTERS
-            
-            chapters = self.chapter_detector.detect_chapters(extracted_text)
-            
-            # ===== 4. Chunk Text =====
+            # ===== 3. Hierarchical Chunking =====
             logger.info(f"[{document_id}] Stage: {ProcessingStage.CHUNKING.value}")
             current_stage = ProcessingStage.CHUNKING
             
-            all_chunks = self.chunking_service.chunk_text(extracted_text)
+            context_chunks, child_chunks = self.chunking_service.create_hierarchical_chunks(extracted_text)
+            logger.info(f"[{document_id}] Created {len(context_chunks)} parent chunks, {len(child_chunks)} child chunks")
             
-            # ===== 5. Contextualize Chunks =====
+            # ===== 4. Contextualize Chunks =====
             logger.info(f"[{document_id}] Stage: {ProcessingStage.CONTEXTUALIZING.value}")
             current_stage = ProcessingStage.CONTEXTUALIZING
             
@@ -86,29 +79,28 @@ class FictionProcessor:
                 "project_id": project_id
             }
             
-            contextualized_chunks = await self.contextualizer.contextualize_chapters(
-                chapters=chapters,
-                all_chunks=all_chunks,
+            contextualized_chunks = await self.contextualizer.contextualize_hierarchical(
+                context_chunks=context_chunks,
+                child_chunks=child_chunks,
                 book_metadata=book_metadata
             )
             
-            # ===== 6. Generate Embeddings =====
+            # ===== 5. Generate Embeddings =====
             logger.info(f"[{document_id}] Stage: {ProcessingStage.GENERATING_EMBEDDINGS.value}")
             current_stage = ProcessingStage.GENERATING_EMBEDDINGS
             
-            # Embed contextualized text
-            contextualized_texts = [chunk.contextualized_text for chunk in contextualized_chunks]
-            dense_vectors = await self.embedding_service.generate_embeddings(contextualized_texts)
+            # Embed combined text (context description + original chunk)
+            combined_texts = [chunk.combined_text for chunk in contextualized_chunks]
+            dense_vectors = await self.embedding_service.generate_embeddings(combined_texts)
             
-            # ===== 7. Generate BM25 Sparse Vectors =====
+            # ===== 6. Generate BM25 Sparse Vectors =====
             logger.info(f"[{document_id}] Stage: {ProcessingStage.GENERATING_BM25.value}")
             current_stage = ProcessingStage.GENERATING_BM25
             
-            # Use original text for BM25 (better keyword matching)
-            original_texts = [chunk.original_text for chunk in contextualized_chunks]
-            sparse_vectors = self.bm25_service.generate_sparse_vectors_batch(original_texts)
+            # Use combined text for BM25 (includes context + original)
+            sparse_vectors = self.bm25_service.generate_sparse_vectors_batch(combined_texts)
             
-            # ===== 8. Store in Qdrant =====
+            # ===== 7. Store in Qdrant =====
             logger.info(f"[{document_id}] Stage: {ProcessingStage.STORING_VECTORS.value}")
             current_stage = ProcessingStage.STORING_VECTORS
             
@@ -156,7 +148,8 @@ class FictionProcessor:
                 "status": "completed",
                 "document_id": document_id,
                 "chunks_processed": len(contextualized_chunks),
-                "chapters_detected": len(chapters)
+                "parent_chunks": len(context_chunks),
+                "child_chunks": len(child_chunks)
             }
             
         except Exception as e:

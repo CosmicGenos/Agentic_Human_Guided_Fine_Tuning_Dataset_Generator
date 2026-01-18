@@ -40,7 +40,7 @@ class Chunk(BaseModel):
 
 
 class Chapter(BaseModel):
-    """Represents a book chapter"""
+    """Represents a book chapter (DEPRECATED - use ContextChunk)"""
     chapter_number: int
     title: Optional[str] = None
     start_char: int
@@ -49,8 +49,41 @@ class Chapter(BaseModel):
     token_count: int
 
 
+class ContextChunk(BaseModel):
+    """Parent chunk for contextualization (30k tokens)"""
+    context_id: int
+    text: str
+    token_count: int
+    start_index: int
+    end_index: int
+    child_indices: List[int] = Field(default_factory=list)
+
+
+class ChildChunk(BaseModel):
+    """Child chunk for retrieval (800 tokens)"""
+    index: int
+    parent_context_id: int
+    original_text: str
+    start_index: int
+    end_index: int
+    token_count: int
+
+
+class ContextualizedChildChunk(BaseModel):
+    """Child chunk after LLM contextualization"""
+    index: int
+    parent_context_id: int
+    original_text: str
+    context_description: str
+    combined_text: str  # context_description + "\n\n" + original_text
+    start_index: int
+    end_index: int
+    token_count: int
+    metadata: Optional[Dict[str, Any]] = None
+
+
 class ContextualizedChunk(BaseModel):
-    """Chunk with contextualized text"""
+    """Chunk with contextualized text (DEPRECATED - use ContextualizedChildChunk)"""
     index: int
     original_text: str
     contextualized_text: str

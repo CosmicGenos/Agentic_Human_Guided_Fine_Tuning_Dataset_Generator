@@ -11,6 +11,7 @@ PyMuPDF>=1.23.0
 # Text chunking
 llama-index-core>=0.10.0
 tiktoken>=0.5.0
+chonkie>=0.1.0  # Hierarchical chunking with overlaps
 
 # LLM and embeddings
 openai>=1.0.0
