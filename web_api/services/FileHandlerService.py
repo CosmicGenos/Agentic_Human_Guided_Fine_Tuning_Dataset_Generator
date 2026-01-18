@@ -1,19 +1,21 @@
 import uuid
 from pathlib import Path
 from fastapi import UploadFile, HTTPException
-from src.data_models.BeanieModels import DocumentModel, ProjectModel
-from src.data_models.enums import FileType, Datatype
+from web_api.data_models.BeanieModels import DocumentModel, ProjectModel
+from web_api.data_models.enums import FileType, Datatype
 from beanie import PydanticObjectId
 
 class FileHandlerService:
     BASE_UPLOAD_DIR = "Uploaded_Files"
     
     def __init__(self):
+        
         self.pdf_dir = Path(self.BASE_UPLOAD_DIR) / "pdf"
         self.images_dir = Path(self.BASE_UPLOAD_DIR) / "images"
         self._ensure_directories()
     
     def _ensure_directories(self):
+        Path(self.BASE_UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
         self.pdf_dir.mkdir(parents=True, exist_ok=True)
         self.images_dir.mkdir(parents=True, exist_ok=True)
     
@@ -27,7 +29,6 @@ class FileHandlerService:
             raise HTTPException(status_code=400, detail=f"Unsupported file type: {extension}")
     
     async def _validate_project_exists(self, project_id: PydanticObjectId):
-        """Validate that project exists"""
         project = await ProjectModel.get(project_id)
         if not project:
             raise HTTPException(status_code=404, detail=f"Project with ID {project_id} not found")
@@ -45,7 +46,6 @@ class FileHandlerService:
         Returns:
             DocumentModel: The created document record
         """
-        # Convert string to ObjectId and validate project exists
         try:
             project_obj_id = PydanticObjectId(project_id)
         except Exception:
@@ -113,7 +113,7 @@ class FileHandlerService:
         return documents
     
     async def get_document_by_id(self, document_id: str) -> DocumentModel:
-        """Get document by ID"""
+ 
         try:
             doc_obj_id = PydanticObjectId(document_id)
         except Exception:
@@ -125,11 +125,10 @@ class FileHandlerService:
         return document
     
     async def list_all_documents(self) -> list[DocumentModel]:
-        """List all documents"""
+
         return await DocumentModel.find_all().to_list()
     
     async def get_documents_by_project(self, project_id: str) -> list[DocumentModel]:
-        """Get all documents for a specific project"""
         try:
             project_obj_id = PydanticObjectId(project_id)
         except Exception:
@@ -141,7 +140,7 @@ class FileHandlerService:
         return documents
     
     async def delete_document(self, document_id: str):
-        """Delete a document and its file"""
+
         document = await self.get_document_by_id(document_id)
         
         # Delete physical file
@@ -154,7 +153,7 @@ class FileHandlerService:
         return {"message": "Document deleted successfully"}
     
     async def delete_documents_by_project(self, project_id: str):
-        """Delete all documents associated with a project"""
+
         documents = await self.get_documents_by_project(project_id)
         
         for document in documents:

@@ -1,6 +1,6 @@
 from pymongo import AsyncMongoClient
 from beanie import init_beanie
-from src.data_models.BeanieModels import DocumentModel,ProjectModel
+from web_api.data_models.BeanieModels import DocumentModel,ProjectModel
 import os
 from contextlib import asynccontextmanager
 
@@ -22,7 +22,7 @@ async def init_db():
 
 async def close_db():
     if db.client:
-        db.client.close()
+        await db.client.close()
 
 @asynccontextmanager
 async def lifespan_context():

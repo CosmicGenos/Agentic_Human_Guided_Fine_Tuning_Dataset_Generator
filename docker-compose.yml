@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # Redis - Message broker and result backend
+  redis:
+    image: redis:7-alpine
+    container_name: synthetic_data_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Qdrant - Vector database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: synthetic_data_qdrant
+    ports:
+      - "6333:6333"  # HTTP API
+      - "6334:6334"  # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT_ALLOW_RECOVERY_MODE=true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB - Already running, but included for reference
+  # mongodb:
+  #   image: mongo:7
+  #   container_name: synthetic_data_mongo
+  #   ports:
+  #     - "27017:27017"
+  #   volumes:
+  #     - mongo_data:/data/db
+  #   environment:
+  #     - MONGO_INITDB_DATABASE=synthetic_data
+
+  # Flower - Celery monitoring (optional)
+  flower:
+    image: mher/flower:latest
+    container_name: synthetic_data_flower
+    command: celery --broker=redis://redis:6379/0 flower --port=5555
+    ports:
+      - "5555:5555"
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+
+volumes:
+  redis_data:
+    driver: local
+  qdrant_data:
+    driver: local
+  # mongo_data:
+  #   driver: local
+
+networks:
+  default:
+    name: synthetic_data_network

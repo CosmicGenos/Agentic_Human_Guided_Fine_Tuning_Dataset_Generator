@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from src.database import init_db, close_db
-from src.routers.FileMangerRouter import router as file_router
-from src.routers.ProjectMangerRouter import router as project_router
+from web_api.database import init_db, close_db
+from web_api.routers.FileMangerRouter import router as file_router
+from web_api.routers.ProjectMangerRouter import router as project_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
