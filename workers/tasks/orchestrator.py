@@ -4,6 +4,7 @@ from celery import Task
 from workers.celery_app import celery_app
 from workers.models import TaskData
 from workers.tasks.fiction_processor import FictionProcessor
+from workers.tasks.academic_processor import AcademicProcessor
 from workers.enums import DataCategory
 import logging
 
@@ -61,8 +62,7 @@ async def _process_documents_async(task: Task, task_data: TaskData):
     if task_data.data_type == DataCategory.FICTION.value:
         processor = FictionProcessor()
     elif task_data.data_type == DataCategory.ACADEMIC.value:
-        # TODO: Implement academic processor
-        raise NotImplementedError("Academic processor not yet implemented")
+        processor = AcademicProcessor()
     else:
         raise ValueError(f"Unknown data type: {task_data.data_type}")
     

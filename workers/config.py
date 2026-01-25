@@ -60,6 +60,28 @@ class Config:
     # ========== OpenAI Configuration ==========
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     
+    # ========== Marker Configuration (Academic PDFs) ==========
+    MARKER_OUTPUT_FORMAT = "markdown"
+    MARKER_USE_LLM = True
+    MARKER_FORCE_OCR = True
+    MARKER_REDO_INLINE_MATH = True
+    MARKER_LLM_SERVICE = "marker.services.gemini.GoogleGeminiService"
+    MARKER_TIMEOUT = 120  # seconds
+    
+    # ========== Vision Model Configuration (Image Captioning) ==========
+    VISION_MODEL_PROVIDER = os.getenv("VISION_MODEL_PROVIDER", "gemini")  # gemini, openai, ollama
+    VISION_MODEL_NAME = "gemini-2.0-flash-exp"
+    VISION_CONTEXT_WINDOW = 300  # characters before/after image for context
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    
+    # ========== Academic Chunking Configuration ==========
+    ACADEMIC_PARENT_CHUNK_SIZE = 30000  # tokens - same as fiction
+    ACADEMIC_PARENT_CHUNK_OVERLAP = 5000  # tokens - MUST have overlap
+    ACADEMIC_CHILD_CHUNK_SIZE = 800  # tokens - no overlap (pre-segmentation)
+    ACADEMIC_TABLE_CHUNK_MAX_ROWS = 50  # max rows per table chunk
+    ACADEMIC_CODE_CHUNK_SIZE = 800  # tokens for code chunks
+    ACADEMIC_MATH_KEEP_WHOLE = True  # never split math blocks
+    
     # ========== Retry Configuration ==========
     MAX_RETRIES = 3
     RETRY_BACKOFF_BASE = 2  # Exponential backoff: 2^attempt seconds
@@ -74,6 +96,9 @@ class Config:
         r"^\d+\.$",  # "1.", "2.", etc.
     ]
 
+    #=========== Acdamic tempory file dir ==========
+    TEMP_FILE_DIR = os.getenv("TEMP_FILE_DIR", "/tmp/celery_files/acdemic")
+    TEMP_FILE_RETENTION_HOURS = 1 
 
 class FictionConfig:
     """Fiction-specific configuration"""

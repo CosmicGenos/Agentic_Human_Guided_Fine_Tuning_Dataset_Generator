@@ -1,4 +1,4 @@
-
+from chonkie import SentenceChunker
 from typing import List, Tuple
 from workers.models import Chunk, ContextChunk, ChildChunk
 from workers.config import Config
@@ -16,7 +16,7 @@ class ChunkingService:
         child_chunk_size=None,
         child_overlap=None
     ):
-        from chonkie import SentenceChunker
+
         
         self.parent_chunk_size = parent_chunk_size or Config.PARENT_CHUNK_SIZE
         self.parent_overlap = parent_overlap or Config.PARENT_CHUNK_OVERLAP

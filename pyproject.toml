@@ -9,7 +9,7 @@ dependencies = [
     "marker-pdf",
     "streamlit",
     "streamlit-ace",
-    "chonkie",
+    "chonkie[code]",
     "fastapi[standard]",
     "motor>=3.3.0",
     "pymongo",
@@ -26,4 +26,6 @@ dependencies = [
     "python-json-logger>=2.0.7",
     "ipykernel>=7.1.0",
     "matplotlib>=3.10.8",
+    "google-generativeai>=0.8.6",
+    "pillow>=10.4.0",
 ]

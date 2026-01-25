@@ -42,7 +42,6 @@ class TempFileManager:
             shutil.rmtree(task_dir)
             logger.info(f"Deleted task directory: {task_dir}")
         else:
-            # Check if old enough
             mod_time = datetime.fromtimestamp(task_dir.stat().st_mtime)
             age = datetime.now() - mod_time
             
@@ -65,3 +64,6 @@ class TempFileManager:
                         logger.info(f"Cleaned up old directory: {task_dir}")
                 except Exception as e:
                     logger.error(f"Failed to clean up {task_dir}: {str(e)}")
+
+
+    

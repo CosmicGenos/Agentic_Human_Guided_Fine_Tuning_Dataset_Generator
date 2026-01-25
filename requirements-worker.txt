@@ -8,6 +8,13 @@ redis>=5.0.0
 # PDF processing
 PyMuPDF>=1.23.0
 
+# Marker for academic PDFs (markdown conversion)
+marker-pdf[full]>=1.10.0
+
+# Vision models for image captioning
+google-generativeai>=0.3.0  # Gemini vision
+Pillow>=10.0.0  # Image processing
+
 # Text chunking
 llama-index-core>=0.10.0
 tiktoken>=0.5.0
