@@ -1,7 +1,7 @@
 import uuid
 from pathlib import Path
 from fastapi import UploadFile, HTTPException
-from web_api.data_models.BeanieModels import DocumentModel, ProjectModel
+from web_api.data_models.BasicBeanieModels import DocumentModel, ProjectModel
 from web_api.data_models.enums import FileType, Datatype
 from beanie import PydanticObjectId
 

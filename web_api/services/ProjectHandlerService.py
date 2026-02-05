@@ -1,4 +1,4 @@
-from web_api.data_models.BeanieModels import ProjectModel
+from web_api.data_models.BasicBeanieModels import ProjectModel
 from web_api.data_models.enums import Datatype
 from fastapi import HTTPException
 from beanie import PydanticObjectId

@@ -1,6 +1,7 @@
 from pymongo import AsyncMongoClient
 from beanie import init_beanie
-from web_api.data_models.BeanieModels import DocumentModel,ProjectModel
+from web_api.data_models.BasicBeanieModels import DocumentModel, ProjectModel, ChunkModel
+from web_api.data_models.ExtractedModels import ExtractedFictionModel, ExtractedAcademicModel
 import os
 from contextlib import asynccontextmanager
 
@@ -17,7 +18,13 @@ async def init_db():
     
     await init_beanie(
         database=db.client[database_name],
-        document_models=[DocumentModel,ProjectModel]
+        document_models=[
+            DocumentModel,
+            ProjectModel,
+            ChunkModel,
+            ExtractedFictionModel,
+            ExtractedAcademicModel
+        ]
     )
 
 async def close_db():

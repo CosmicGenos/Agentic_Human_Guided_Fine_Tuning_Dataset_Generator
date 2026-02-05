@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query
 from web_api.services.FileHandlerService import FileHandlerService
-from web_api.data_models.BeanieModels import DocumentModel
+from web_api.data_models.BasicBeanieModels import DocumentModel
 from web_api.data_models.enums import Datatype
 
 router = APIRouter(prefix="/files", tags=["File Management"])

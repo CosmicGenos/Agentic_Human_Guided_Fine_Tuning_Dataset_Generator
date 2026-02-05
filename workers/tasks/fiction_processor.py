@@ -7,6 +7,7 @@ from workers.services.contextualizer import Contextualizer
 from workers.services.embedding_service import EmbeddingService
 from workers.services.bm25_service import BM25Service
 from workers.services.storage_service import StorageService
+from workers.services.extracted_storage_service import ExtractedContentStorageService
 from workers.utils.temp_file_manager import TempFileManager
 from workers.utils.webhook_notifier import WebhookNotifier
 from workers.enums import ProcessingStage
@@ -25,6 +26,7 @@ class FictionProcessor:
         self.embedding_service = EmbeddingService()
         self.bm25_service = BM25Service()
         self.storage_service = StorageService()
+        self.extracted_storage = ExtractedContentStorageService()
         self.temp_file_manager = TempFileManager()
         self.webhook_notifier = WebhookNotifier()
     
@@ -61,6 +63,29 @@ class FictionProcessor:
             
             if not extracted_text.strip():
                 raise ValueError("Extracted text is empty")
+            
+            # ===== 2.5. Store Extracted Text =====
+            logger.info(f"[{document_id}] Stage: STORING_EXTRACTED_TEXT")
+            current_stage = "storing_extracted_text"
+            
+            extraction_metadata = {
+                "page_count": self.text_extractor.get_page_count(file_path),
+                "extraction_method": "PyMuPDF",
+                "character_count": len(extracted_text),
+                "file_size": file_metadata.file_size
+            }
+            
+            try:
+                await self.extracted_storage.store_fiction_text(
+                    document_id=document_id,
+                    project_id=project_id,
+                    extracted_text=extracted_text,
+                    extraction_metadata=extraction_metadata
+                )
+                logger.info(f"[{document_id}] Successfully stored extracted text in MongoDB")
+            except Exception as e:
+                logger.error(f"[{document_id}] Failed to store extracted text: {str(e)}")
+                # Continue processing even if storage fails
             
             # ===== 3. Hierarchical Chunking =====
             logger.info(f"[{document_id}] Stage: {ProcessingStage.CHUNKING.value}")

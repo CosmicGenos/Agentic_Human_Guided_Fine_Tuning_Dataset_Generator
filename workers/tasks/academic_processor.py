@@ -7,6 +7,7 @@ from workers.services.contextualizer import Contextualizer
 from workers.services.embedding_service import EmbeddingService
 from workers.services.bm25_service import BM25Service
 from workers.services.storage_service import StorageService
+from workers.services.extracted_storage_service import ExtractedContentStorageService
 from workers.utils.temp_file_manager import TempFileManager
 from workers.utils.webhook_notifier import WebhookNotifier
 from workers.enums import ProcessingStage
@@ -30,6 +31,7 @@ class AcademicProcessor:
         self.embedding_service = EmbeddingService()
         self.bm25_service = BM25Service()
         self.storage_service = StorageService()
+        self.extracted_storage = ExtractedContentStorageService()
         self.temp_file_manager = TempFileManager()
         self.webhook_notifier = WebhookNotifier()
     
@@ -107,6 +109,55 @@ class AcademicProcessor:
             )
             
             logger.info(f"[{document_id}] Image replacement complete")
+            
+            # ===== 4.5. Store Extracted Academic Content =====
+            logger.info(f"[{document_id}] Stage: STORING_EXTRACTED_ACADEMIC")
+            current_stage = "storing_extracted_academic"
+            
+            try:
+                # Step 1: Upload images to internal API
+                if marker_output.images:
+                    logger.info(f"[{document_id}] Uploading {len(marker_output.images)} images...")
+                    image_paths = [img.path for img in marker_output.images]
+                    
+                    upload_result = await self.extracted_storage.upload_academic_images(
+                        document_id=document_id,
+                        image_files=image_paths
+                    )
+                    logger.info(f"[{document_id}] Uploaded {upload_result['images_saved']} images")
+                
+                # Step 2: Prepare image metadata
+                image_metadata_list = [
+                    {
+                        "filename": img.filename,
+                        "description": image_descriptions.get(img.filename, ""),
+                        "position_in_markdown": marker_output.markdown_text.find(img.filename),
+                        "alt_text": None
+                    }
+                    for img in marker_output.images
+                ]
+                
+                # Step 3: Store markdown and metadata in MongoDB
+                extraction_metadata = {
+                    "marker_config": marker_output.metadata["marker_config"],
+                    "character_count": len(enriched_markdown),
+                    "image_count": len(marker_output.images),
+                    "source_pdf": str(pdf_path)
+                }
+                
+                await self.extracted_storage.store_academic_content(
+                    document_id=document_id,
+                    project_id=project_id,
+                    markdown_text=marker_output.markdown_text,
+                    enriched_markdown=enriched_markdown,
+                    images=image_metadata_list,
+                    extraction_metadata=extraction_metadata
+                )
+                logger.info(f"[{document_id}] Successfully stored academic content in MongoDB")
+                
+            except Exception as e:
+                logger.error(f"[{document_id}] Failed to store academic content: {str(e)}")
+                # Continue processing even if storage fails
             
             # ===== 5. Smart Hierarchical Chunking =====
             logger.info(f"[{document_id}] Stage: {ProcessingStage.CHUNKING.value}")
