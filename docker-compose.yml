@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # Redis - Message broker and result backend
   redis:
     image: redis:7-alpine
     container_name: synthetic_data_redis
@@ -44,7 +43,7 @@ services:
   #   environment:
   #     - MONGO_INITDB_DATABASE=synthetic_data
 
-  # Flower - Celery monitoring (optional)
+
   flower:
     image: mher/flower:latest
     container_name: synthetic_data_flower
