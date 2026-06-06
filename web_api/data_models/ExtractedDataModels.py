@@ -32,7 +32,7 @@ class StoreAcademicRequest(BaseModel):
 class ImageMetadataResponse(BaseModel):
     """Image metadata in response"""
     filename: str
-    file_path: str
+    minio_key: str
     description: str
     position_in_markdown: int
     alt_text: Optional[str] = None

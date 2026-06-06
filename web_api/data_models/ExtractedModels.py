@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any, List
 class ExtractedImageMetadata(BaseModel):
     """Metadata for a single extracted image from academic PDF"""
     filename: str
-    file_path: str  # Absolute path: D:/Synthetic_Data_Genration/Uploaded_Files/images/{document_id}/{filename}
+    minio_key: str  # MinIO object key: academic-images/{document_id}/{filename}
     description: str  # AI-generated description from vision service
     position_in_markdown: int  # Character position in original markdown
     alt_text: Optional[str] = None
