@@ -9,7 +9,7 @@ class DocumentModel(Document):
     true_title: str
     stored_title: str
     file_type: FileType
-    file_path: str
+    minio_key: str
     data_catgory: Datatype
     project_id: PydanticObjectId
 
