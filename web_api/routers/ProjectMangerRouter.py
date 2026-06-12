@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from web_api.services.ProjectHandlerService import ProjectHandlerService
 from web_api.services.FileHandlerService import FileHandlerService
-from web_api.data_models.BeanieModels import ProjectModel
+from web_api.data_models.BasicBeanieModels import ProjectModel
 from web_api.data_models.DataModels import CreateProjectRequest, UpdateProjectRequest
 
 router = APIRouter(prefix="/projects", tags=["Project Management"])
