@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+/*
+  @theme registers design tokens as Tailwind utilities.
+  --color-accent  →  bg-accent, text-accent, border-accent, bg-accent/50, etc.
+  --font-serif    →  font-serif
+  --radius-sm     →  rounded-sm
+  --shadow-md     →  shadow-md
+
+  Palette philosophy: a calm, slightly cool-neutral dark base with a small
+  family of accents that harmonize — a violet primary, a warm coral secondary,
+  and a soft teal. The hero display type uses a violet→pink→peach gradient that
+  sweeps across all three so the whole UI feels like one coherent family.
+*/
+@theme {
+  /* Surfaces — near-black with a faint cool tint so it never looks muddy */
+  --color-canvas:  #0a0a0d;
+  --color-deep:    #101016;
+  --color-window:  #16161f;
+  --color-surface: #1e1e29;
+  --color-raised:  #282834;
+
+  /* Borders */
+  --color-edge:        rgba(255, 255, 255, 0.07);
+  --color-edge-strong: rgba(255, 255, 255, 0.13);
+
+  /* Foreground — a warm-leaning off-white, easier on the eyes than pure white */
+  --color-fg:    #ece9f0;
+  --color-soft:  #a09eac;
+  --color-muted: #67656f;
+
+  /* Accent — violet primary */
+  --color-accent:       oklch(0.72 0.13 295);
+  --color-accent-hover: oklch(0.77 0.14 295);
+
+  /* Secondary accents that harmonize with the violet */
+  --color-coral: oklch(0.78 0.13 35);   /* warm peach/coral */
+  --color-iris:  oklch(0.74 0.12 330);  /* pink/magenta bridge */
+  --color-teal:  oklch(0.80 0.09 200);  /* soft cool tertiary */
+
+  /* Status */
+  --color-success: oklch(0.74 0.09 155);
+  --color-warning: oklch(0.79 0.10 80);
+  --color-danger:  oklch(0.70 0.13 25);
+
+  /* Typography */
+  --font-sans:  'Hanken Grotesk', system-ui, sans-serif;
+  --font-serif: 'Spectral', Georgia, serif;
+  --font-mono:  'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Border radius (overrides Tailwind defaults) */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  /* Shadows (overrides Tailwind defaults) */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+/*
+  NOTE: do NOT add `* { margin: 0; padding: 0 }` here. This file's rules are
+  unlayered, and in Tailwind v4 unlayered CSS overrides everything inside
+  @layer utilities — a blanket padding/margin reset would silently kill every
+  p-*, px-*, and m-* utility in the app. Tailwind's Preflight already resets
+  margins and box-sizing (inside a layer, so utilities still win).
+*/
+
+html { color-scheme: dark; }
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Text selection picks up the brand violet instead of the OS default */
+::selection {
+  background: color-mix(in oklch, var(--color-accent) 35%, transparent);
+  color: var(--color-fg);
+}
+
+/*
+  Kill the browser autofill repaint. Chrome/Safari paint a hard yellow/olive
+  background over autofilled inputs — that was the ugly bar on the password
+  field. We can't set background-color directly (the UA style wins), but an
+  inset box-shadow the size of the field covers it, and a long transition
+  delay stops it from flashing yellow before our shadow applies.
+*/
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--color-fg);
+  -webkit-box-shadow: 0 0 0 1000px var(--color-deep) inset;
+  caret-color: var(--color-fg);
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-raised); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-edge-strong); }
+
+/*
+  Reusable display gradient: sweeps violet → pink → peach across the accents.
+  Apply with class="text-gradient" on any text element.
+*/
+.text-gradient {
+  background: linear-gradient(
+    105deg,
+    var(--color-accent) 0%,
+    var(--color-iris) 45%,
+    var(--color-coral) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Slow, ambient drift for the background glow blobs on the hero */
+@keyframes drift {
+  0%   { transform: translate(0, 0)        scale(1);    }
+  50%  { transform: translate(4%, -3%)     scale(1.08); }
+  100% { transform: translate(0, 0)        scale(1);    }
+}
+.animate-drift { animation: drift 18s ease-in-out infinite; }

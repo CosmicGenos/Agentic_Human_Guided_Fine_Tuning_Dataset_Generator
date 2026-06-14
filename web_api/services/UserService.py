@@ -66,3 +66,6 @@ class UserService:
             return user.id
         except Exception as e:
             raise RuntimeError("Failed to update username and password") from e
+        
+    async def find_email(self, email: str) -> UserModel | None:
+        return await UserModel.find_one(UserModel.email == email)

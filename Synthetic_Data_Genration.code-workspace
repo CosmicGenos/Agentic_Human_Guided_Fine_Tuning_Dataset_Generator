@@ -1,8 +1,17 @@
 {
   "folders": [
-    { "path": ".",       "name": "root" },
-    { "path": "web_api",  "name": "web_api" },
-    { "path": "workers",  "name": "workers" }
+    {
+      "path": ".",
+      "name": "root"
+    },
+    {
+      "path": "web_api",
+      "name": "web_api"
+    },
+    {
+      "path": "workers",
+      "name": "workers"
+    }
   ],
   "settings": {
     "files.exclude": {

@@ -3,16 +3,27 @@ from web_api.services.SecurityService import SecurityService
 from web_api.data_models.UserModels import UserModel
 from datetime import datetime, timedelta, timezone
 from pydantic import EmailStr
-from data_models.enums import AppRole
+from data_models.enums import AppRole,ProjectRole
 from web_api.services.EmailService import EmailService
 from pydantic import EmailStr 
 from beanie import PydanticObjectId
+from pydantic import BaseModel
+from web_api.services.JWTService import JWTService
+
+
+class AuthPayload(BaseModel):
+    email: EmailStr
+    username: str
+    user_id: str
+    role: AppRole
+
 
 
 class AuthService:
-    def __init__(self, userService: UserService, securityService: SecurityService):
+    def __init__(self, userService: UserService, securityService: SecurityService, jwtService: JWTService):
         self.user_service = userService
         self.security_service = securityService
+        self.jwt_service = jwtService
 
     async def add_user(self,email : EmailStr, app_role : AppRole , email_service: EmailService):
         user: UserModel|None = await self.user_service.find_email(email)
@@ -43,3 +54,29 @@ class AuthService:
         hashed_password = self.security_service.hash_password(new_password)
         user_id = await self.user_service.update_UserName_and_Password(user_id, user_name, hashed_password)
         return user_id
+    
+    async def authenticate_user(self, email: EmailStr, password: str) -> UserModel:
+        user = await self.user_service.find_email(email)
+        if not user:
+            raise Exception("Invalid email or password")
+        if not user.is_active:
+            raise Exception("User is not active")
+        if not self.security_service.verify_password(password, user.hashed_password):
+            raise Exception("Invalid email or password")
+        
+        auth_payload = AuthPayload(
+            email=user.email,
+            username=user.username,
+            user_id=str(user.id),
+            role=user.app_role
+        )
+    
+        return self.jwt_service.create_token(auth_payload.model_dump())
+    
+    
+
+
+
+
+        
+

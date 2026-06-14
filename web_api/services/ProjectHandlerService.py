@@ -6,17 +6,7 @@ from beanie import PydanticObjectId
 class ProjectHandlerService:
     @staticmethod
     async def create_project(project_title: str, project_description: str, main_data_type: Datatype) -> ProjectModel:
-        """
-        Create a new project record in MongoDB
-        
-        Args:
-            project_title: Title of the project
-            project_description: Description of the project
-            main_data_type: Main data type associated with the project
-            
-        Returns:
-            ProjectModel: The created project record
-        """
+
         project = ProjectModel(
             project_title=project_title,
             project_description=project_description,

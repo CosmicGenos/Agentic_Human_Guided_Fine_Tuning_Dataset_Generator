@@ -37,7 +37,6 @@ class ProjectMemberModel(Document):
     class Settings:
         name = "project_members"
         indexes = [
-            # A user can hold only one role per project; also serves member lookups
             IndexModel([("project_id", ASCENDING), ("user_id", ASCENDING)], unique=True),
             IndexModel([("user_id", ASCENDING)]),
         ]
