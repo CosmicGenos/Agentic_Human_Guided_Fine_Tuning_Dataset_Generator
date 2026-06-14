@@ -15,11 +15,82 @@ interface FormErrors {
 
 function validate(email: string, password: string): FormErrors {
   const errors: FormErrors = {};
-  if (!email)                             errors.email    = 'Email is required';
-  else if (!/\S+@\S+\.\S+/.test(email))  errors.email    = 'Enter a valid email';
-  if (!password)                          errors.password = 'Password is required';
+  if (!email)                            errors.email    = 'Email is required';
+  else if (!/\S+@\S+\.\S+/.test(email)) errors.email    = 'Enter a valid email';
+  if (!password)                         errors.password = 'Password is required';
   return errors;
 }
+
+function LumanMark({ variant, size, maskId }: { variant: 'black' | 'white'; size: number; maskId: string }) {
+  return (
+    <svg viewBox="0 0 120 120" width={size} height={size} aria-label="Luman" role="img">
+      <defs>
+        <mask id={maskId}>
+          <rect width="120" height="120" fill="#fff" />
+          <rect x="44" y="44" width="32" height="32" rx="7" fill="#000" transform="rotate(45 60 60)" />
+        </mask>
+      </defs>
+      <rect
+        x="22" y="22" width="76" height="76" rx="28"
+        fill={variant === 'white' ? '#FFFFFF' : '#16140F'}
+        mask={`url(#${maskId})`}
+      />
+    </svg>
+  );
+}
+
+const OUTPUT_TYPES = [
+  {
+    label: 'Chat',
+    desc: 'Instruction tuning',
+    format: 'messages · JSONL',
+    preview: (
+      <div className="font-mono text-[10px] space-y-1.5" style={{ color: 'rgba(22,20,15,0.5)' }}>
+        <div>
+          <span style={{ color: 'rgba(22,20,15,0.35)' }}>user</span>
+          {'  · "Explain the concept of…"'}
+        </div>
+        <div>
+          <span style={{ color: 'rgba(22,20,15,0.35)' }}>asst</span>
+          {'  · "Sure, here is how…"'}
+        </div>
+      </div>
+    ),
+  },
+  {
+    label: 'CoT',
+    desc: 'Chain of Thought',
+    format: '<think> blocks',
+    preview: (
+      <div className="font-mono text-[10px] space-y-0.5" style={{ color: 'rgba(22,20,15,0.5)' }}>
+        <div style={{ color: 'rgba(22,20,15,0.35)' }}>&lt;think&gt;</div>
+        <div className="pl-3">Let me reason step by step…</div>
+        <div style={{ color: 'rgba(22,20,15,0.35)' }}>&lt;/think&gt;</div>
+      </div>
+    ),
+  },
+  {
+    label: 'DPO',
+    desc: 'Preference pairs',
+    format: 'audit trail mining',
+    preview: (
+      <div className="space-y-1.5 font-mono text-[10px]">
+        <div className="flex items-center gap-2.5">
+          <span style={{ color: '#3a7d44' }}>✓ chosen&nbsp;&nbsp;</span>
+          <div className="flex-1 h-1 rounded-full" style={{ background: 'rgba(22,20,15,0.12)' }}>
+            <div className="h-full rounded-full w-4/5" style={{ background: 'rgba(22,20,15,0.4)' }} />
+          </div>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <span style={{ color: '#9b3a3a' }}>✗ rejected</span>
+          <div className="flex-1 h-1 rounded-full" style={{ background: 'rgba(22,20,15,0.12)' }}>
+            <div className="h-full rounded-full w-2/5" style={{ background: 'rgba(22,20,15,0.22)' }} />
+          </div>
+        </div>
+      </div>
+    ),
+  },
+];
 
 export default function LoginPage() {
   const { login, user } = useAuth();
@@ -37,10 +108,7 @@ export default function LoginPage() {
 
   async function handleSubmit() {
     const fieldErrors = validate(email, password);
-    if (Object.keys(fieldErrors).length > 0) {
-      setErrors(fieldErrors);
-      return;
-    }
+    if (Object.keys(fieldErrors).length > 0) { setErrors(fieldErrors); return; }
     setErrors({});
     setLoading(true);
     try {
@@ -59,157 +127,152 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-svh grid lg:grid-cols-2 bg-canvas">
-      {/* ── Left: brand hero ───────────────────────────────────── */}
-      <HeroPanel />
+    <div className="min-h-svh grid lg:grid-cols-2">
 
-      {/* ── Right: sign-in ─────────────────────────────────────── */}
-      <div className="relative flex items-center justify-center px-6 py-12">
+      {/* ── Left: dark panel + form ── */}
+      <div
+        className="relative flex flex-col items-center justify-center px-8 py-12"
+        style={{ background: '#16140F' }}
+      >
+        {/* top-left brand */}
+        <button
+          onClick={() => navigate('/')}
+          className="absolute top-6 left-7 flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity"
+        >
+          <LumanMark variant="white" size={26} maskId="lm-left" />
+          <span className="text-sm font-medium text-[#E5DCC8]" style={{ fontFamily: 'var(--font-serif)' }}>
+            Luman
+          </span>
+        </button>
+
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
-          className="w-full max-w-[380px] flex flex-col gap-8"
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="w-full max-w-[360px] flex flex-col gap-6"
         >
-          {/* Brand mark — only shown here on small screens (hero is hidden) */}
-          <div className="flex flex-col items-center gap-3 lg:hidden">
-            <BrandGlyph />
-            <h1 className="text-2xl font-semibold tracking-tight font-serif text-gradient">
-              SynthQA
-            </h1>
+          <div>
+            <h2 className="text-xl font-semibold text-[#E5DCC8]">Sign in</h2>
+            <p className="text-xs mt-1" style={{ color: 'rgba(229,220,200,0.4)' }}>
+              Enter your credentials to continue
+            </p>
           </div>
 
-          <div className="bg-window border border-edge rounded-lg p-7 flex flex-col gap-5 shadow-lg">
-            <div>
-              <h2 className="text-base font-semibold text-fg">Sign in</h2>
-              <p className="text-xs text-muted mt-0.5">Enter your credentials to continue</p>
-            </div>
+          {errors.general && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="rounded-md px-3 py-2.5"
+              style={{ background: 'rgba(120,20,20,0.25)', border: '1px solid rgba(180,50,50,0.25)' }}
+            >
+              <p className="text-xs text-danger">{errors.general}</p>
+            </motion.div>
+          )}
 
-            {errors.general && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="bg-danger/15 border border-danger/20 rounded-sm px-3 py-2.5"
-              >
-                <p className="text-xs text-danger">{errors.general}</p>
-              </motion.div>
-            )}
+          <form
+            onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }}
+            noValidate
+            className="flex flex-col gap-4"
+          >
+            <FormField label="Email" htmlFor="email" error={errors.email}>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                error={errors.email}
+                autoComplete="email"
+                autoFocus
+              />
+            </FormField>
 
-            <form onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }} noValidate className="flex flex-col gap-4">
-              <FormField label="Email" htmlFor="email" error={errors.email}>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  error={errors.email}
-                  autoComplete="email"
-                  autoFocus
-                />
-              </FormField>
+            <FormField label="Password" htmlFor="password" error={errors.password}>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                error={errors.password}
+                autoComplete="current-password"
+              />
+            </FormField>
 
-              <FormField label="Password" htmlFor="password" error={errors.password}>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  error={errors.password}
-                  autoComplete="current-password"
-                />
-              </FormField>
+            <Button type="submit" size="lg" loading={loading} className="w-full mt-1">
+              {loading ? 'Signing in…' : 'Sign in'}
+            </Button>
+          </form>
 
-              <Button type="submit" size="lg" loading={loading} className="w-full mt-1">
-                {loading ? 'Signing in…' : 'Sign in'}
-              </Button>
-            </form>
-          </div>
-
-          <p className="text-center text-xs text-muted">
+          <p className="text-center text-xs" style={{ color: 'rgba(229,220,200,0.22)' }}>
             Access is by invitation only.
           </p>
         </motion.div>
       </div>
-    </div>
-  );
-}
 
-/* ── Hero panel (left half on lg+) ──────────────────────────── */
-function HeroPanel() {
-  const lines = ['Create', 'however', 'you like.'];
-
-  return (
-    <div className="relative hidden lg:flex flex-col justify-between overflow-hidden border-r border-edge px-14 py-12 bg-deep">
-      {/* Ambient gradient glow */}
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="animate-drift absolute -top-24 -left-16 h-96 w-96 rounded-full bg-accent/25 blur-[120px]" />
-        <div className="animate-drift absolute top-1/3 -right-24 h-96 w-96 rounded-full bg-iris/20 blur-[120px]" style={{ animationDelay: '-6s' }} />
-        <div className="animate-drift absolute -bottom-24 left-1/4 h-96 w-96 rounded-full bg-coral/15 blur-[120px]" style={{ animationDelay: '-12s' }} />
-      </div>
-
-      {/* Brand */}
-      <motion.div
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
-        className="relative flex items-center gap-2.5"
+      {/* ── Right: sand panel + branding ── */}
+      <div
+        className="hidden lg:flex flex-col items-center justify-center px-12 py-16 gap-12"
+        style={{ background: '#E5DCC8' }}
       >
-        <BrandGlyph />
-        <span className="text-sm font-semibold tracking-tight text-fg font-serif">SynthQA</span>
-      </motion.div>
-
-      {/* Headline */}
-      <div className="relative">
-        <h1 className="font-serif font-semibold leading-[1.02] tracking-tight text-[clamp(3rem,6vw,5rem)]">
-          {lines.map((line, i) => (
-            <motion.span
-              key={line}
-              initial={{ opacity: 0, y: 24 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: 0.15 + i * 0.12 }}
-              className="block text-gradient"
-            >
-              {line}
-            </motion.span>
-          ))}
-        </h1>
-        <motion.p
-          initial={{ opacity: 0, y: 16 }}
+        {/* Logo lockup */}
+        <motion.div
+          initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: 'easeOut', delay: 0.55 }}
-          className="mt-6 max-w-sm text-sm leading-relaxed text-soft"
+          transition={{ duration: 0.6, ease: 'easeOut', delay: 0.1 }}
+          className="flex flex-col items-center gap-4"
         >
-          Turn your documents into high-quality, human-reviewed datasets.
-          Generate question–answer pairs your way, then keep the ones worth keeping.
-        </motion.p>
+          <LumanMark variant="black" size={72} maskId="lm-right" />
+          <h1
+            className="text-5xl font-semibold text-[#16140F]"
+            style={{ fontFamily: 'var(--font-serif)', letterSpacing: '-0.045em' }}
+          >
+            Luman
+          </h1>
+          <p className="text-sm text-center max-w-[260px] leading-relaxed" style={{ color: 'rgba(22,20,15,0.5)' }}>
+            Turn your documents into high-quality, human-reviewed
+            LLM fine-tune datasets.
+          </p>
+        </motion.div>
+
+        {/* Output type cards */}
+        <div className="flex flex-col gap-3 w-full max-w-[320px]">
+          {OUTPUT_TYPES.map((t, i) => (
+            <motion.div
+              key={t.label}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.45, delay: 0.25 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+              className="rounded-xl px-4 py-3.5 flex flex-col gap-2.5"
+              style={{
+                background: 'rgba(255,255,255,0.38)',
+                border: '1px solid rgba(22,20,15,0.1)',
+              }}
+            >
+              <div className="flex items-baseline justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold font-mono tracking-wide text-[#16140F]">
+                    {t.label}
+                  </span>
+                  <span className="text-[10px]" style={{ color: 'rgba(22,20,15,0.45)' }}>
+                    {t.desc}
+                  </span>
+                </div>
+                <span className="text-[9px] font-mono" style={{ color: 'rgba(22,20,15,0.3)' }}>
+                  {t.format}
+                </span>
+              </div>
+              <div
+                className="border-t pt-2.5"
+                style={{ borderColor: 'rgba(22,20,15,0.08)' }}
+              >
+                {t.preview}
+              </div>
+            </motion.div>
+          ))}
+        </div>
       </div>
 
-      {/* Footer tagline */}
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.6, delay: 0.7 }}
-        className="relative text-xs text-muted"
-      >
-        Human-in-the-loop dataset generation
-      </motion.p>
-    </div>
-  );
-}
-
-function BrandGlyph() {
-  return (
-    <div className="w-11 h-11 rounded-md flex items-center justify-center bg-accent/15 border border-accent/25 shrink-0">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-        <rect x="4" y="2" width="12" height="16" rx="2" stroke="var(--color-accent)" strokeWidth="1.5" />
-        <line x1="7" y1="7"  x2="13" y2="7"  stroke="var(--color-accent)" strokeWidth="1.5" strokeLinecap="round" />
-        <line x1="7" y1="10" x2="13" y2="10" stroke="var(--color-accent)" strokeWidth="1.5" strokeLinecap="round" />
-        <line x1="7" y1="13" x2="11" y2="13" stroke="var(--color-accent)" strokeWidth="1.5" strokeLinecap="round" />
-        <circle cx="18" cy="17" r="4" fill="var(--color-deep)" stroke="var(--color-coral)" strokeWidth="1.5" />
-        <text x="18" y="20.5" textAnchor="middle" fontSize="5" fontFamily="var(--font-mono)" fill="var(--color-coral)" fontWeight="600">QA</text>
-      </svg>
     </div>
   );
 }
