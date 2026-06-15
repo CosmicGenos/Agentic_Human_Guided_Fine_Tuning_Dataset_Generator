@@ -45,15 +45,9 @@ const OUTPUT_TYPES = [
     desc: 'Instruction tuning',
     format: 'messages · JSONL',
     preview: (
-      <div className="font-mono text-[10px] space-y-1.5" style={{ color: 'rgba(22,20,15,0.5)' }}>
-        <div>
-          <span style={{ color: 'rgba(22,20,15,0.35)' }}>user</span>
-          {'  · "Explain the concept of…"'}
-        </div>
-        <div>
-          <span style={{ color: 'rgba(22,20,15,0.35)' }}>asst</span>
-          {'  · "Sure, here is how…"'}
-        </div>
+      <div className="font-mono text-[10px] space-y-1.5" style={{ color: 'rgba(229,220,200,0.45)' }}>
+        <div><span style={{ color: 'rgba(229,220,200,0.28)' }}>user</span>{'  · "Explain the concept of…"'}</div>
+        <div><span style={{ color: 'rgba(229,220,200,0.28)' }}>asst</span>{'  · "Sure, here is how…"'}</div>
       </div>
     ),
   },
@@ -62,10 +56,10 @@ const OUTPUT_TYPES = [
     desc: 'Chain of Thought',
     format: '<think> blocks',
     preview: (
-      <div className="font-mono text-[10px] space-y-0.5" style={{ color: 'rgba(22,20,15,0.5)' }}>
-        <div style={{ color: 'rgba(22,20,15,0.35)' }}>&lt;think&gt;</div>
+      <div className="font-mono text-[10px] space-y-0.5" style={{ color: 'rgba(229,220,200,0.45)' }}>
+        <div style={{ color: 'rgba(229,220,200,0.28)' }}>&lt;think&gt;</div>
         <div className="pl-3">Let me reason step by step…</div>
-        <div style={{ color: 'rgba(22,20,15,0.35)' }}>&lt;/think&gt;</div>
+        <div style={{ color: 'rgba(229,220,200,0.28)' }}>&lt;/think&gt;</div>
       </div>
     ),
   },
@@ -76,15 +70,15 @@ const OUTPUT_TYPES = [
     preview: (
       <div className="space-y-1.5 font-mono text-[10px]">
         <div className="flex items-center gap-2.5">
-          <span style={{ color: '#3a7d44' }}>✓ chosen&nbsp;&nbsp;</span>
-          <div className="flex-1 h-1 rounded-full" style={{ background: 'rgba(22,20,15,0.12)' }}>
-            <div className="h-full rounded-full w-4/5" style={{ background: 'rgba(22,20,15,0.4)' }} />
+          <span style={{ color: '#6db87a' }}>✓ chosen&nbsp;&nbsp;</span>
+          <div className="flex-1 h-1 rounded-full" style={{ background: 'rgba(229,220,200,0.1)' }}>
+            <div className="h-full rounded-full w-4/5" style={{ background: 'rgba(229,220,200,0.35)' }} />
           </div>
         </div>
         <div className="flex items-center gap-2.5">
-          <span style={{ color: '#9b3a3a' }}>✗ rejected</span>
-          <div className="flex-1 h-1 rounded-full" style={{ background: 'rgba(22,20,15,0.12)' }}>
-            <div className="h-full rounded-full w-2/5" style={{ background: 'rgba(22,20,15,0.22)' }} />
+          <span style={{ color: '#c47a7a' }}>✗ rejected</span>
+          <div className="flex-1 h-1 rounded-full" style={{ background: 'rgba(229,220,200,0.1)' }}>
+            <div className="h-full rounded-full w-2/5" style={{ background: 'rgba(229,220,200,0.18)' }} />
           </div>
         </div>
       </div>
@@ -129,92 +123,22 @@ export default function LoginPage() {
   return (
     <div className="min-h-svh grid lg:grid-cols-2">
 
-      {/* ── Left: dark panel + form ── */}
+      {/* ── Left: dark panel + branding ── */}
       <div
-        className="relative flex flex-col items-center justify-center px-8 py-12"
+        className="relative hidden lg:flex flex-col items-center justify-center px-12 py-16 gap-12"
         style={{ background: '#16140F' }}
       >
-        {/* top-left brand */}
+        {/* top-left home link */}
         <button
           onClick={() => navigate('/')}
-          className="absolute top-6 left-7 flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity"
+          className="absolute top-6 left-7 flex items-center gap-2 transition-opacity opacity-50 hover:opacity-100"
         >
-          <LumanMark variant="white" size={26} maskId="lm-left" />
+          <LumanMark variant="white" size={26} maskId="lm-nav" />
           <span className="text-sm font-medium text-[#E5DCC8]" style={{ fontFamily: 'var(--font-serif)' }}>
             Luman
           </span>
         </button>
 
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          className="w-full max-w-[360px] flex flex-col gap-6"
-        >
-          <div>
-            <h2 className="text-xl font-semibold text-[#E5DCC8]">Sign in</h2>
-            <p className="text-xs mt-1" style={{ color: 'rgba(229,220,200,0.4)' }}>
-              Enter your credentials to continue
-            </p>
-          </div>
-
-          {errors.general && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="rounded-md px-3 py-2.5"
-              style={{ background: 'rgba(120,20,20,0.25)', border: '1px solid rgba(180,50,50,0.25)' }}
-            >
-              <p className="text-xs text-danger">{errors.general}</p>
-            </motion.div>
-          )}
-
-          <form
-            onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }}
-            noValidate
-            className="flex flex-col gap-4"
-          >
-            <FormField label="Email" htmlFor="email" error={errors.email}>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                error={errors.email}
-                autoComplete="email"
-                autoFocus
-              />
-            </FormField>
-
-            <FormField label="Password" htmlFor="password" error={errors.password}>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                error={errors.password}
-                autoComplete="current-password"
-              />
-            </FormField>
-
-            <Button type="submit" size="lg" loading={loading} className="w-full mt-1">
-              {loading ? 'Signing in…' : 'Sign in'}
-            </Button>
-          </form>
-
-          <p className="text-center text-xs" style={{ color: 'rgba(229,220,200,0.22)' }}>
-            Access is by invitation only.
-          </p>
-        </motion.div>
-      </div>
-
-      {/* ── Right: sand panel + branding ── */}
-      <div
-        className="hidden lg:flex flex-col items-center justify-center px-12 py-16 gap-12"
-        style={{ background: '#E5DCC8' }}
-      >
         {/* Logo lockup */}
         <motion.div
           initial={{ opacity: 0, y: -12 }}
@@ -222,14 +146,14 @@ export default function LoginPage() {
           transition={{ duration: 0.6, ease: 'easeOut', delay: 0.1 }}
           className="flex flex-col items-center gap-4"
         >
-          <LumanMark variant="black" size={72} maskId="lm-right" />
+          <LumanMark variant="white" size={72} maskId="lm-hero" />
           <h1
-            className="text-5xl font-semibold text-[#16140F]"
+            className="text-5xl font-semibold text-[#E5DCC8]"
             style={{ fontFamily: 'var(--font-serif)', letterSpacing: '-0.045em' }}
           >
             Luman
           </h1>
-          <p className="text-sm text-center max-w-[260px] leading-relaxed" style={{ color: 'rgba(22,20,15,0.5)' }}>
+          <p className="text-sm text-center max-w-[260px] leading-relaxed" style={{ color: 'rgba(229,220,200,0.45)' }}>
             Turn your documents into high-quality, human-reviewed
             LLM fine-tune datasets.
           </p>
@@ -240,37 +164,121 @@ export default function LoginPage() {
           {OUTPUT_TYPES.map((t, i) => (
             <motion.div
               key={t.label}
-              initial={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.45, delay: 0.25 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
               className="rounded-xl px-4 py-3.5 flex flex-col gap-2.5"
               style={{
-                background: 'rgba(255,255,255,0.38)',
-                border: '1px solid rgba(22,20,15,0.1)',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.08)',
               }}
             >
               <div className="flex items-baseline justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-semibold font-mono tracking-wide text-[#16140F]">
+                  <span className="text-[11px] font-semibold font-mono tracking-wide text-[#E5DCC8]">
                     {t.label}
                   </span>
-                  <span className="text-[10px]" style={{ color: 'rgba(22,20,15,0.45)' }}>
+                  <span className="text-[10px]" style={{ color: 'rgba(229,220,200,0.4)' }}>
                     {t.desc}
                   </span>
                 </div>
-                <span className="text-[9px] font-mono" style={{ color: 'rgba(22,20,15,0.3)' }}>
+                <span className="text-[9px] font-mono" style={{ color: 'rgba(229,220,200,0.25)' }}>
                   {t.format}
                 </span>
               </div>
-              <div
-                className="border-t pt-2.5"
-                style={{ borderColor: 'rgba(22,20,15,0.08)' }}
-              >
+              <div className="border-t pt-2.5" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
                 {t.preview}
               </div>
             </motion.div>
           ))}
         </div>
+      </div>
+
+      {/* ── Right: sand panel + form ── */}
+      <div
+        className="flex flex-col items-center justify-center px-8 py-12"
+        style={{ background: '#E5DCC8' }}
+      >
+        {/* mobile-only brand mark */}
+        <button
+          onClick={() => navigate('/')}
+          className="lg:hidden flex items-center gap-2 mb-10 opacity-70 hover:opacity-100 transition-opacity"
+        >
+          <LumanMark variant="black" size={26} maskId="lm-mobile" />
+          <span className="text-sm font-medium text-[#16140F]" style={{ fontFamily: 'var(--font-serif)' }}>
+            Luman
+          </span>
+        </button>
+
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="w-full max-w-[360px]"
+        >
+          {/* form card — dark on sand */}
+          <div
+            className="rounded-2xl px-8 py-8 flex flex-col gap-6"
+            style={{ background: '#16140F' }}
+          >
+            <div>
+              <h2 className="text-xl font-semibold text-[#E5DCC8]">Sign in</h2>
+              <p className="text-xs mt-1" style={{ color: 'rgba(229,220,200,0.4)' }}>
+                Enter your credentials to continue
+              </p>
+            </div>
+
+            {errors.general && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="rounded-md px-3 py-2.5"
+                style={{ background: 'rgba(120,20,20,0.25)', border: '1px solid rgba(180,50,50,0.25)' }}
+              >
+                <p className="text-xs text-danger">{errors.general}</p>
+              </motion.div>
+            )}
+
+            <form
+              onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }}
+              noValidate
+              className="flex flex-col gap-4"
+            >
+              <FormField label="Email" htmlFor="email" error={errors.email}>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  error={errors.email}
+                  autoComplete="email"
+                  autoFocus
+                />
+              </FormField>
+
+              <FormField label="Password" htmlFor="password" error={errors.password}>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  error={errors.password}
+                  autoComplete="current-password"
+                />
+              </FormField>
+
+              <Button type="submit" variant="ghost" size="lg" loading={loading} className="w-full mt-1 text-[#E5DCC8]/70 border-[#E5DCC8]/15 hover:text-[#E5DCC8] hover:bg-[#E5DCC8]/6 hover:border-[#E5DCC8]/25">
+                {loading ? 'Signing in…' : 'Sign in'}
+              </Button>
+            </form>
+
+            <p className="text-center text-xs" style={{ color: 'rgba(229,220,200,0.22)' }}>
+              Access is by invitation only.
+            </p>
+          </div>
+        </motion.div>
       </div>
 
     </div>
