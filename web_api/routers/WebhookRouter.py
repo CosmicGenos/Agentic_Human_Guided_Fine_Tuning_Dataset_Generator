@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 from beanie import PydanticObjectId
-from web_api.data_models.BeanieModels import DocumentModel, ChunkModel
+from web_api.data_models.BasicBeanieModels import DocumentModel, ChunkModel
 
 router = APIRouter(prefix="/webhooks", tags=["Webhooks"])
 

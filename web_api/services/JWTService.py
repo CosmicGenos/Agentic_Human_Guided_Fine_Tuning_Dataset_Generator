@@ -14,8 +14,7 @@ class JWTService:
 
     def create_token(self, data: dict) -> str:
         to_encode = data.copy()
-        expire = lambda: datetime.now(timezone.utc) + timedelta(minutes=self.token_expiry_minutes)
-        to_encode.update({"exp": expire})
+        to_encode.update({"exp": datetime.now(timezone.utc) + timedelta(minutes=self.token_expiry_minutes)})
         encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
         return encoded_jwt
 
