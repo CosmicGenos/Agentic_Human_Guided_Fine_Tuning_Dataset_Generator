@@ -20,31 +20,32 @@ class AuthPayload(BaseModel):
 
 
 class AuthService:
-    def __init__(self, userService: UserService, securityService: SecurityService, jwtService: JWTService):
+    def __init__(self, userService: UserService, securityService: SecurityService, jwtService: JWTService, emailService: EmailService):
         self.user_service = userService
         self.security_service = securityService
         self.jwt_service = jwtService
+        self.email_service = emailService
 
-    async def add_user(self,email : EmailStr, app_role : AppRole , email_service: EmailService):
+    async def add_user(self,email : EmailStr, app_role : AppRole ):
         user: UserModel|None = await self.user_service.find_email(email)
         if user:
             raise Exception("User already exists")
         setup_token = self.security_service.generate_secure_token()
         setup_token_expiry = datetime.now(timezone.utc) + timedelta(hours=24)
         new_user = await self.user_service.add_new_user(email, app_role, setup_token, setup_token_expiry)
-        resend_id = await email_service.send_email(email, setup_token)
-        await email_service.save_email_verification(new_user.id, resend_id)
+        resend_id = await self.email_service.send_email(email, setup_token)
+        await self.email_service.save_email_verification(new_user.id, resend_id)
         return new_user
     
-    async def authenticate_initial_token(self, token: str) -> UserModel:
-        user = await UserModel.find_one(UserModel.setup_token == token)
+    async def authenticate_initial_token(self, token: str) -> UserModel | None:
+        user = await self.user_service.find_user_by_token(token)
         if not user:
             raise Exception("Invalid token")
         if user.setup_token_expiry < datetime.now(timezone.utc):
             raise Exception("Token expired")
         return user
     
-    async def set_credentials_first_login(self, user_id: PydanticObjectId, user_name: str, new_password: str):
+    async def set_credentials_first_login(self, user_id: PydanticObjectId, user_name: str, new_password: str)-> PydanticObjectId:
         if not await self.user_service.is_user_active(user_id):
             raise Exception("User is not active")
         if not await self.user_service.is_must_change_password(user_id):
@@ -55,7 +56,7 @@ class AuthService:
         user_id = await self.user_service.update_UserName_and_Password(user_id, user_name, hashed_password)
         return user_id
     
-    async def authenticate_user(self, email: EmailStr, password: str) -> UserModel:
+    async def authenticate_user(self, email: EmailStr, password: str) -> str:
         user = await self.user_service.find_email(email)
         if not user:
             raise Exception("Invalid email or password")

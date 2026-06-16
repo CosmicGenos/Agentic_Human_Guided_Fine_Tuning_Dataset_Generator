@@ -12,7 +12,7 @@ class UserModel(Document):
 
     app_role: AppRole = AppRole.USER
     is_active: bool = True
-    must_change_password: bool = False
+    must_change_password: bool = True
 
     setup_token: str = None
     setup_token_expiry: datetime = None

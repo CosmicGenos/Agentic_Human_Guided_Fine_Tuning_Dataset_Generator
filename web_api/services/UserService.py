@@ -1,5 +1,5 @@
 import email
-from web_api.services.AuthService import SecurityService
+from web_api.services.SecurityService import SecurityService
 from beanie import PydanticObjectId
 from web_api.data_models.UserModels import UserModel
 
@@ -69,3 +69,16 @@ class UserService:
         
     async def find_email(self, email: str) -> UserModel | None:
         return await UserModel.find_one(UserModel.email == email)
+    
+    async def find_user_by_token(self, token: str) -> UserModel | None:
+        return await UserModel.find_one(UserModel.setup_token == token)
+    
+    async def change_must_change_password(self, user_id: PydanticObjectId, must_change: bool):
+        user = await UserModel.get(user_id)
+        if not user:
+            raise Exception("User not found")
+        user.must_change_password = must_change
+        try:
+            await user.save()
+        except Exception as e:
+            raise RuntimeError("Failed to update must_change_password") from e
