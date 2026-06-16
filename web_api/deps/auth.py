@@ -1,6 +1,6 @@
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
-
+from web_api.errors import InvalidCredentials,AuthorizationError
 from web_api.services.JWTService import JWTService
 from web_api.services.AuthService import AuthPayload
 from web_api.data_models.enums import AppRole
@@ -22,11 +22,7 @@ def _get_current_user(
         payload_dict = jwt_service.verify_token(token)
         return AuthPayload(**payload_dict)
     except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise InvalidCredentials("Invalid authentication token") 
 
 
 def _require_role(*allowed_roles: AppRole):
@@ -36,11 +32,7 @@ def _require_role(*allowed_roles: AppRole):
         current_user: AuthPayload = Depends(_get_current_user),
     ) -> AuthPayload:
         if current_user.role not in allowed_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Access denied. Required role: "
-                f"{[r.value for r in allowed_roles]}",
-            )
+            raise AuthorizationError("Access denied. Insufficient permissions.")
         return current_user
 
     return dependency
