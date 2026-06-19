@@ -11,6 +11,16 @@ class Datatype(Enum):
     ACADAMIC = "acdamic"
 
 
+class AppRole(str, Enum):
+    ADMIN = "admin"
+    USER  = "user"
+
+
+class ProjectRole(str, Enum):
+    OWNER  = "owner"
+    WORKER = "worker"
+
+
 class ModelProvider(str, Enum):
     # ── Chat / LLM ──────────────────────────────────
     OPENAI       = "openai"

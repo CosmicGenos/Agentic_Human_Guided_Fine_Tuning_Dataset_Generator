@@ -5,11 +5,16 @@ from web_api.routers.FileMangerRouter import router as file_router
 from web_api.routers.ProjectMangerRouter import router as project_router
 from web_api.routers.CredentialRouter import router as credential_router
 from web_api.routers.ModelConfigRouter import router as model_config_router
+from web_api.services.JWTService import JWTService
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    app.state.jwt_service = JWTService()
     yield
     await close_db()
 
