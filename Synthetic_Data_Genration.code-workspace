@@ -11,6 +11,10 @@
     {
       "path": "workers",
       "name": "workers"
+    },
+    {
+      "path": "front-end",
+      "name": "front-end"
     }
   ],
   "settings": {
@@ -18,7 +22,8 @@
       "**/__pycache__": true,
       "**/*.pyc": true,
       "web_api": true,
-      "workers": true
+      "workers": true,
+      "front-end": true
     },
     "python.analysis.diagnosticMode": "openFilesOnly",
     "git.openRepositoryInParentFolders": "always"
@@ -31,7 +36,8 @@
         "name": "Run all · web_api + workers",
         "configurations": [
           { "folder": "web_api", "name": "web_api · FastAPI" },
-          { "folder": "workers", "name": "workers · Celery" }
+          { "folder": "workers", "name": "workers · Celery" },
+          { "folder": "front-end", "name": "front-end · Vite" }
         ],
         "stopAll": true
       }
