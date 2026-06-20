@@ -13,3 +13,5 @@ wheels/
 .env
 
 Uploaded_Files/
+
+notebooks/chonkie_experiments.ipynb
