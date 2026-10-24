@@ -7,23 +7,19 @@ Celery document-processing workers. Independent uv project
 
 ## Containers needed
 Redis (broker) · Qdrant  + `web_api` running
-(workers never touch Postgres/MinIO directly: they fetch files & post results via
+(workers never touch Postgres or Silo storage directly: they fetch files & post results via
 web_api `/internal/*` and webhooks, authenticated with `X-Internal-Token`).
 
-## Install
-```
-cd workers && uv sync     # first sync pulls torch + Marker — large, one-time
+## Install (from repo root)
+```powershell
+uv sync --project workers     # first sync pulls torch + Marker: large, one-time
 ```
 
 ## Run  (from repo root)
+```powershell
+uv run --project workers celery -A workers.celery_app worker --loglevel=info --pool=solo
 ```
-workers\.venv\Scripts\activate
-celery -A workers.celery_app worker --loglevel=info --pool=solo
-```
-Without activating:
-```
-workers\.venv\Scripts\celery.exe -A workers.celery_app worker --loglevel=info --pool=solo
-```
+Ready when the log says `celery@<machine> ready.` (about 30 seconds).
 
 `--pool=solo` is **required** on Windows.
 

@@ -25,7 +25,8 @@ services:
     environment:
       - QDRANT_ALLOW_RECOVERY_MODE=true
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      # the qdrant image has no curl/wget; bash's /dev/tcp checks the port is accepting connections
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/127.0.0.1/6333"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -52,14 +53,16 @@ services:
       timeout: 3s
       retries: 10
 
-  minio:
-    image: minio/minio:latest
-    container_name: synthetic_data_minio
+  # Silo - S3 object storage (uploads, extracted text, images). A maintained MinIO fork:
+  # same S3 API and MINIO_* variables, so the app's MINIO_* settings and minio client work as-is.
+  silo:
+    image: pgsty/silo:RELEASE.2026-10-18T00-00-00Z   # pinned; bump on purpose
+    container_name: synthetic_data_silo
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "9000:9000"  # S3 API
+      - "9001:9001"  # web console
     volumes:
-      - minio_data:/data
+      - silo_data:/data
     environment:
       - MINIO_ROOT_USER=${MINIO_ACCESS_KEY:-minioadmin}
       - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY:-minioadmin}
@@ -88,7 +91,7 @@ volumes:
     driver: local
   qdrant_data:
     driver: local
-  minio_data:
+  silo_data:
     driver: local
   postgres_data:
     driver: local

@@ -75,7 +75,7 @@ The result is a clean, exportable fine-tuning dataset in standard formats (Chat,
 ┌────────────────────────────────────────────────────────────────┐
 │                    Data Layer                                   │
 │                                                                  │
-│   PostgreSQL        MinIO            Qdrant         Redis       │
+│   PostgreSQL        Silo             Qdrant         Redis       │
 │   (users, projects, (uploads,        (dense +       (Celery     │
 │    jobs, QA pairs,   extracted text,  sparse         broker)    │
 │    LangGraph         images)          vectors)                  │
@@ -100,7 +100,7 @@ The result is a clean, exportable fine-tuning dataset in standard formats (Chat,
 | Phase 1: Document Processing | Ingest, extract, chunk, embed, store | Celery (heavy, blocking tasks) |
 | Phase 2: QA Generation | Generate, retrieve, validate, review, export | LangGraph (agentic, async LLM calls) |
 
-Redis is only the Celery broker. PostgreSQL holds all application state and the LangGraph checkpoints (in a separate `langgraph` schema). MinIO holds files: uploads, extracted text/markdown, and extracted images.
+Redis is only the Celery broker. PostgreSQL holds all application state and the LangGraph checkpoints (in a separate `langgraph` schema). Silo holds files: uploads, extracted text/markdown, and extracted images.
 
 ### 2.3 Provider & Credential System
 
@@ -116,7 +116,7 @@ Every LLM call in the platform — contextualization, embedding, question genera
 
 **Worker access to keys:** Celery tasks carry only IDs. The worker fetches the project's models and keys from an internal endpoint once per job and keeps them in memory, so keys never sit in Redis.
 
-**Workers:** When a Celery task is dispatched, the web API fetches and decrypts the relevant credentials and passes them in the task payload. Workers use the passed credentials, falling back to environment variables if none are provided. Workers never talk to PostgreSQL or MinIO directly: they fetch files and report results through web API `/internal/*` and `/webhooks/*` routes, authenticated with a shared `X-Internal-Token`.
+**Workers:** When a Celery task is dispatched, the web API fetches and decrypts the relevant credentials and passes them in the task payload. Workers use the passed credentials, falling back to environment variables if none are provided. Workers never talk to PostgreSQL or Silo directly: they fetch files and report results through web API `/internal/*` and `/webhooks/*` routes, authenticated with a shared `X-Internal-Token`.
 
 ---
 
@@ -138,7 +138,7 @@ PDF Upload
     ↓
 PyMuPDF → raw text extraction
     ↓
-Stored → MinIO (text) + PostgreSQL `extractions` row (key + stats)
+Stored → Silo (text) + PostgreSQL `extractions` row (key + stats)
     ↓
 Chonkie hierarchical chunking
     ├─ Parent chunks: 30,000 tokens, 5,000 overlap
@@ -175,10 +175,10 @@ Image replacement in markdown
     ├─ Before: ![alt](image.png)
     └─ After: **[IMAGE: alt]**\n{description}\n
     ↓
-Stored → MinIO + PostgreSQL
-    └─ text.md (original markdown)       → MinIO
-    └─ enriched.md (image descriptions)  → MinIO
-    └─ images                            → MinIO
+Stored → Silo + PostgreSQL
+    └─ text.md (original markdown)       → Silo 
+    └─ enriched.md (image descriptions)  → Silo 
+    └─ images                            → Silo 
     └─ keys, stats, image descriptions   → `extractions` / `extracted_images` rows
     ↓
 Smart markdown-aware chunking
@@ -279,13 +279,13 @@ Before question generation begins, documents are re-chunked with different param
 | Overlap | 5,000 tokens (parent) | None |
 | Purpose | Semantic search target | Question generation input |
 | Storage | Qdrant (permanent) | PostgreSQL `qa_chunks` (temporary) |
-| Source | Original PDF | Extracted text already in MinIO |
+| Source | Original PDF | Extracted text already in Silo |
 
 **Why 60,000 tokens?** Standard LLM context windows are ~128k tokens. Half is reserved for the prompt template, generated questions, and system instructions. 60k tokens is dense enough to generate multiple diverse questions while staying within context limits.
 
 **Source for academic documents**: `enriched_markdown` (with image descriptions inlined) — not `markdown_text`. This gives the question generator awareness of visual content.
 
-No re-processing of PDFs. Content is read directly from the extracted text in MinIO (located via the `extractions` table).
+No re-processing of PDFs. Content is read directly from the extracted text in Silo (located via the `extractions` table).
 
 ### 4.3 LangGraph Graph Structure
 
@@ -294,7 +294,7 @@ No re-processing of PDFs. Content is read directly from the extracted text in Mi
                     │  chunk_node │
                     │             │
                     │ Fetch from  │
-                    │ MinIO,      │
+                    │ Silo ,      │
                     │ rechunk to  │
                     │ 60k tokens  │
                     └──────┬──────┘
@@ -559,7 +559,7 @@ A user can simultaneously be a Project Owner of one project and a Worker in anot
 
 ## 7. Data Models
 
-PostgreSQL tables via SQLAlchemy 2 (async) with Alembic migrations — see `web_api/db/models/` for the source of truth. All ids are UUIDs; all timestamps are `TIMESTAMPTZ`; enums are stored as text with a CHECK constraint. Large content (files, extracted text) lives in MinIO; tables store the object keys.
+PostgreSQL tables via SQLAlchemy 2 (async) with Alembic migrations — see `web_api/db/models/` for the source of truth. All ids are UUIDs; all timestamps are `TIMESTAMPTZ`; enums are stored as text with a CHECK constraint. Large content (files, extracted text) lives in Silo; tables store the object keys.
 
 ### 7.1 Implemented Tables
 
@@ -599,7 +599,7 @@ The creator is added as `owner` in the same transaction; a project always keeps 
 #### `documents`
 ```
 project_id:     → projects (cascade)
-original_name, storage_key (MinIO, unique), file_type (pdf | images),
+original_name, storage_key (Silo, unique), file_type (pdf | images),
 content_type, size_bytes
 status:         uploaded | queued | processing | completed | failed
 error, uploaded_by, processed_at
@@ -813,7 +813,7 @@ POST   /projects                            Create (caller becomes owner)
 GET    /projects                            Projects I'm a member of (admin: all)
 GET    /projects/{id}
 PATCH  /projects/{id}                       Owner
-DELETE /projects/{id}                       Owner — cascades documents, config, MinIO files
+DELETE /projects/{id}                       Owner — cascades documents, config, Silo files
 
 GET    /projects/{id}/members
 POST   /projects/{id}/members               Add by email (owner)
@@ -940,7 +940,7 @@ POST   /webhooks/processing-failed         Marks the document failed with the st
 | Database | PostgreSQL 17 (Docker) | All application state |
 | ORM / driver | SQLAlchemy 2 (async) + psycopg 3 | Typed models, async access |
 | Migrations | Alembic | Versioned schema changes |
-| Object storage | MinIO | Uploads, extracted text, extracted images |
+| Object storage | Silo | Uploads, extracted text, extracted images |
 | Task queue | Celery | Document processing (Phase 1) |
 | Message broker | Redis 7 | Celery broker |
 | QA orchestration | LangGraph | Agentic QA pipeline (Phase 2) |
@@ -967,7 +967,7 @@ services:
   postgres:   # 127.0.0.1:5433 — app DB + LangGraph checkpoints (roles: synth_owner, synth_app)
   redis:      # port 6379 — Celery broker
   qdrant:     # port 6333 — vector database
-  minio:      # ports 9000 (API) / 9001 (console) — object storage
+  silo:       # ports 9000 (S3 API) / 9001 (console) — object storage (maintained MinIO fork)
   flower:     # port 5555 — Celery monitoring
 ```
 
@@ -986,7 +986,7 @@ Two database roles: `synth_owner` owns the schema and runs migrations; `synth_ap
 │   ├── routers/             HTTP layer
 │   ├── services/            business logic
 │   ├── scripts/             create_admin, setup_checkpointer
-│   ├── tests/               pytest (test database, faked email/MinIO/Celery)
+│   ├── tests/               pytest (test database, faked email/storage/Celery)
 │   └── qa_pipeline/         LangGraph graph, nodes, state               [PLANNED]
 │
 ├── workers/                 Celery document processing (own uv project)

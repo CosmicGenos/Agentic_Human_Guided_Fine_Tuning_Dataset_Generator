@@ -14,11 +14,12 @@ How to run the project locally. `web_api/` and `workers/` are **separate uv proj
 copy .env.example .env
 
 # 2. Install dependencies (the first workers sync pulls torch + Marker: large, one-time)
-cd web_api ; uv sync ; cd ..
-cd workers ; uv sync ; cd ..
+uv sync --project web_api
+uv sync --project workers
 
-# 3. Start infrastructure: postgres, redis, qdrant, minio, flower
+# 3. Start infrastructure: postgres, redis, qdrant, silo (S3 storage), flower
 docker compose up -d
+docker compose ps         # wait until every service shows (healthy)
 #    Postgres roles (synth_owner / synth_app) are created on the FIRST start only,
 #    from infra/postgres/init/01-roles.sh, using the passwords in .env.
 
@@ -43,20 +44,22 @@ uv run --project workers celery -A workers.celery_app worker --loglevel=info --p
 cd front-end ; npm install ; npm run dev
 ```
 
-On Windows, `--loop asyncio:SelectorEventLoop` (psycopg async can't use the Proactor loop) and `--pool=solo` (Celery) are both required.
+On Windows, `--loop asyncio:SelectorEventLoop` (psycopg async can't use the Proactor loop) and `--pool=solo` (Celery) are both required. Windows PowerShell 5.1 has no `&&`: chain commands with `;`.
+
+The API and the worker each take about 30 seconds to start (imports and LiteLLM's model catalog). The API is up when the log says `Application startup complete.`, the worker when it says `celery@<machine> ready.`
 
 | Service | URL |
 |---|---|
 | API docs | http://localhost:8000/docs |
 | Qdrant | http://localhost:6333/dashboard |
-| MinIO console | http://localhost:9001 |
+| Silo console (storage) | http://localhost:9001 (log in with `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY`) |
 | Flower (Celery) | http://localhost:5555 |
 | Postgres shell | `docker exec -it synthetic_data_postgres psql -U postgres -d synthetic_data` |
 
 ## 3. Everyday tasks
 
 ```powershell
-# Tests (synthetic_data_test database; email, MinIO, Celery, Qdrant and model calls are faked)
+# Tests (synthetic_data_test database; email, storage, Celery, Qdrant and model calls are faked)
 uv run --project web_api pytest web_api/tests
 # Worker tests (no network: BM25, point ids, retry rules)
 uv run --project workers pytest workers/tests
@@ -83,6 +86,7 @@ All settings live in the repo-root `.env`, which both services read. `.env.examp
 - **Email:** if `RESEND_API_KEY` or `FROM_EMAIL` is unset, invite links are written to the API log instead of being emailed.
 - **LLM provider keys** are not environment variables. Admins add them in the app (Credentials); the worker fetches them per job from web_api. Marker (academic PDFs) uses the project's vision model; `GEMINI_API_KEY` in `.env` is only its fallback.
 - **LiteLLM** (both services) downloads its newest model catalog at startup. Set `LITELLM_LOCAL_MODEL_COST_MAP=True` to use the copy bundled with the package (offline; tests do this). The version is pinned in both `pyproject.toml` files; upgrade it on purpose.
+- **Storage (Silo):** Silo is a maintained fork of MinIO (MinIO's community edition is no longer maintained). It keeps MinIO's S3 API and variable names, so the settings are still `MINIO_*` and the code still uses the `minio` Python client (`MinioService`). The image is pinned to a release tag in `docker-compose.yml`.
 - **Qdrant:** one collection per project (`project_<id>`), created by the worker. `QDRANT_URL` is used by the worker and by web_api (to delete collections). The image is pinned to `v1.18.0`: **1.15.2 or newer is required**, because Qdrant computes the BM25 keyword vectors itself. The worker refuses to create collections on an older server.
 
 ## 5. Troubleshooting
@@ -92,7 +96,8 @@ All settings live in the repo-root `.env`, which both services read. `.env.examp
 | `Psycopg cannot use the 'ProactorEventLoop'` | Start uvicorn with `--loop asyncio:SelectorEventLoop` |
 | Every DB call takes ~2 minutes | Use `127.0.0.1` instead of `localhost` in the DB URLs |
 | Postgres password authentication failed | `.env` passwords changed after the first start. Run `ALTER ROLE ... PASSWORD`, or (dev only) `docker compose down -v` to re-run init |
-| API startup waits ~25 s | MinIO isn't running: `docker compose up -d` |
+| `The token '&&' is not a valid statement separator` | Windows PowerShell 5.1: use `;` instead of `&&` |
+| API startup hangs, then warns `MinIO bucket init failed` | Silo isn't running: `docker compose up -d silo` |
 | Celery hangs on tasks | Missing `--pool=solo` (Windows) |
 | `ModuleNotFoundError: web_api` | Run from the repo root |
 | Worker: `Qdrant 1.x is too old` | Update the image: `docker compose pull qdrant; docker compose up -d qdrant`. If the old data won't load, remove the `qdrant_data` volume (dev only; the vectors get rebuilt by reprocessing) |
