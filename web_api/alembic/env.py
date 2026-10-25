@@ -18,9 +18,6 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-# Schemas owned by libraries, not by our migrations (LangGraph checkpointer).
-EXCLUDED_SCHEMAS = {"langgraph"}
-
 
 def _database_url() -> str:
     """`alembic -x db=test ...` targets the test database; default is the main one."""
@@ -33,18 +30,11 @@ def _database_url() -> str:
     return url
 
 
-def _include_name(name, type_, parent_names) -> bool:
-    if type_ == "schema":
-        return name not in EXCLUDED_SCHEMAS
-    return True
-
-
 def _configure(**kwargs) -> None:
     context.configure(
         target_metadata=target_metadata,
         compare_type=True,
         compare_server_default=True,
-        include_name=_include_name,
         **kwargs,
     )
 

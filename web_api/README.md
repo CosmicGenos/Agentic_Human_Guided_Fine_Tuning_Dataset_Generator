@@ -21,8 +21,7 @@ uv sync --project web_api
 # schema for the main and the test database (runs as synth_owner)
 cd web_api ; uv run alembic upgrade head ; uv run alembic -x db=test upgrade head ; cd ..
 
-# LangGraph checkpoint tables + the first admin
-uv run --project web_api python -m web_api.scripts.setup_checkpointer
+# the first admin
 uv run --project web_api python -m web_api.scripts.create_admin --email you@example.com --username admin
 ```
 
