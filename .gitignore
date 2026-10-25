@@ -11,7 +11,8 @@ wheels/
 .venv
 
 # Local secrets (template: .env.example)
-.env
 
 # Scratch notebooks
 *.ipynb
+config.bat
+node_modules
