@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     FROM_EMAIL: str | None = None
     EMAIL_SUBJECT: str = "Welcome to Our App"
     EMAIL_HTML_TEMPLATE: str = ""
-    HOST_URL: str = "http://localhost:5173"
+    HOST_URL: str = "http://localhost:5200"
 
     # ---------- MinIO ----------
     MINIO_ENDPOINT: str = "localhost:9000"
@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     INTERNAL_API_TOKEN: SecretStr
 
     # ---------- HTTP ----------
-    CORS_ORIGINS: str = "http://localhost:5173"  # comma-separated
+    CORS_ORIGINS: str = "http://localhost:5200"  # comma-separated
 
     @property
     def cors_origin_list(self) -> list[str]:

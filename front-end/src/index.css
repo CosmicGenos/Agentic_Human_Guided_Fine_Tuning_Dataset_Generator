@@ -1,77 +1,115 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+/* Light only: `dark:` utilities in shadcn files only fire under a .dark ancestor, which we never set. */
+@custom-variant dark (&:is(.dark *));
 
 /*
-  @theme registers design tokens as Tailwind utilities.
-  --color-accent  →  bg-accent, text-accent, border-accent, bg-accent/50, etc.
-  --font-serif    →  font-serif
-  --radius-sm     →  rounded-sm
-  --shadow-md     →  shadow-md
+  Luman design tokens — warm ink + cream + white (Zen-browser feel). Light only.
+  See docs/frontend-plan.md.
 
-  Palette philosophy: a calm, slightly cool-neutral dark base with a small
-  family of accents that harmonize — a violet primary, a warm coral secondary,
-  and a soft teal. The hero display type uses a violet→pink→peach gradient that
-  sweeps across all three so the whole UI feels like one coherent family.
+  Two layers:
+    1. :root            raw values
+    2. @theme inline    exposes them as Tailwind utilities (bg-card, text-muted-foreground, ...)
+  shadcn's semantic names (background, primary, border, ...) are kept so primitives work,
+  but every value below is ours.
 */
-@theme {
-  /* Surfaces — near-black with a faint cool tint so it never looks muddy */
-  --color-canvas:  #0a0a0d;
-  --color-deep:    #101016;
-  --color-window:  #16161f;
-  --color-surface: #1e1e29;
-  --color-raised:  #282834;
 
-  /* Borders */
-  --color-edge:        rgba(255, 255, 255, 0.07);
-  --color-edge-strong: rgba(255, 255, 255, 0.13);
+:root {
+  --radius: 0.75rem;
 
-  /* Foreground — a warm-leaning off-white, easier on the eyes than pure white */
-  --color-fg:    #ece9f0;
-  --color-soft:  #a09eac;
-  --color-muted: #67656f;
+  /* surfaces */
+  --background: #ffffff;           /* paper: header, footer, cards, dialogs, inputs */
+  --foreground: #16140f;           /* ink */
+  --card: #ffffff;
+  --card-foreground: #16140f;
+  --popover: #ffffff;
+  --popover-foreground: #16140f;
 
-  /* Accent — violet primary */
-  --color-accent:       oklch(0.72 0.13 295);
-  --color-accent-hover: oklch(0.77 0.14 295);
+  /* actions */
+  --primary: #16140f;
+  --primary-foreground: #f4efe3;
+  --secondary: #f3f0e9;
+  --secondary-foreground: #16140f;
+  --accent: #f3f0e9;               /* hover / selected rows & menu items */
+  --accent-foreground: #16140f;
 
-  /* Secondary accents that harmonize with the violet */
-  --color-coral: oklch(0.78 0.13 35);   /* warm peach/coral */
-  --color-iris:  oklch(0.74 0.12 330);  /* pink/magenta bridge */
-  --color-teal:  oklch(0.80 0.09 200);  /* soft cool tertiary */
+  /* text + lines */
+  --muted: #f3f0e9;
+  --muted-foreground: #6e695e;
+  --border: #e2ddd1;
+  --input: #d6d0c2;
+  --ring: #16140f;
 
-  /* Status */
-  --color-success: oklch(0.74 0.09 155);
-  --color-warning: oklch(0.79 0.10 80);
-  --color-danger:  oklch(0.70 0.13 25);
+  --destructive: #a8524d;
 
-  /* Typography */
-  --font-sans:  'Hanken Grotesk', system-ui, sans-serif;
-  --font-serif: 'Spectral', Georgia, serif;
-  --font-mono:  'JetBrains Mono', 'Fira Code', monospace;
+  /* workspace */
+  --workspace: #ebe8e2;            /* cream-2: app background behind white panels */
+  --cream: #e5dcc8;
+  --ink-2: #211e17;
+  --ink-3: #2c2820;
+}
 
-  /* Border radius (overrides Tailwind defaults) */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+
+  --color-workspace: var(--workspace);
+  --color-cream: var(--cream);
+  --color-ink: var(--foreground);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+}
 
-  /* Shadows (overrides Tailwind defaults) */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+@theme {
+  /* muted status hues (fills / dots) and their readable text shades */
+  --color-sage:  #5e8f6a;
+  --color-clay:  #b5645f;
+  --color-amber: #b98a3e;
+  --color-dusty: #5f7fa3;
+  --color-sage-fg:  #3f6b4b;
+  --color-clay-fg:  #8a3f3a;
+  --color-amber-fg: #7a5518;
+  --color-dusty-fg: #3f5f85;
+
+  --font-sans:  'Hanken Grotesk Variable', system-ui, sans-serif;
+  --font-serif: 'Spectral', Georgia, serif;
+  --font-mono:  'JetBrains Mono Variable', 'Fira Code', monospace;
 }
 
 /*
   NOTE: do NOT add `* { margin: 0; padding: 0 }` here. This file's rules are
   unlayered, and in Tailwind v4 unlayered CSS overrides everything inside
-  @layer utilities — a blanket padding/margin reset would silently kill every
-  p-*, px-*, and m-* utility in the app. Tailwind's Preflight already resets
-  margins and box-sizing (inside a layer, so utilities still win).
+  @layer utilities. Preflight already resets margins and box-sizing.
 */
 
-html { color-scheme: dark; }
+html { color-scheme: light; }
 
 body {
-  background: var(--color-canvas);
-  color: var(--color-fg);
+  background: var(--workspace);
+  color: var(--foreground);
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.5;
@@ -85,55 +123,13 @@ body {
   flex-direction: column;
 }
 
-/* Text selection picks up the brand violet instead of the OS default */
 ::selection {
-  background: color-mix(in oklch, var(--color-accent) 35%, transparent);
-  color: var(--color-fg);
+  background: color-mix(in oklab, var(--foreground) 18%, transparent);
 }
 
-/*
-  Kill the browser autofill repaint. Chrome/Safari paint a hard yellow/olive
-  background over autofilled inputs — that was the ugly bar on the password
-  field. We can't set background-color directly (the UA style wins), but an
-  inset box-shadow the size of the field covers it, and a long transition
-  delay stops it from flashing yellow before our shadow applies.
-*/
-input:-webkit-autofill,
-input:-webkit-autofill:hover,
-input:-webkit-autofill:focus,
-input:-webkit-autofill:active {
-  -webkit-text-fill-color: var(--color-fg);
-  -webkit-box-shadow: 0 0 0 1000px var(--color-deep) inset;
-  caret-color: var(--color-fg);
-  transition: background-color 9999s ease-in-out 0s;
-}
+*:focus-visible { outline-color: color-mix(in oklab, var(--ring) 50%, transparent); }
 
-/* Custom scrollbars */
-::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar       { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--color-raised); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: var(--color-edge-strong); }
-
-/*
-  Reusable display gradient: sweeps violet → pink → peach across the accents.
-  Apply with class="text-gradient" on any text element.
-*/
-.text-gradient {
-  background: linear-gradient(
-    105deg,
-    var(--color-accent) 0%,
-    var(--color-iris) 45%,
-    var(--color-coral) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-/* Slow, ambient drift for the background glow blobs on the hero */
-@keyframes drift {
-  0%   { transform: translate(0, 0)        scale(1);    }
-  50%  { transform: translate(4%, -3%)     scale(1.08); }
-  100% { transform: translate(0, 0)        scale(1);    }
-}
-.animate-drift { animation: drift 18s ease-in-out infinite; }
+::-webkit-scrollbar-thumb { background: rgba(22, 20, 15, 0.16); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(22, 20, 15, 0.28); }

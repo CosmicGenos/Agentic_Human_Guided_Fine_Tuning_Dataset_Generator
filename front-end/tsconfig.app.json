@@ -15,7 +15,12 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* Path alias (mirrored in vite.config.ts) */
+    "paths": { "@/*": ["./src/*"] },
+
     /* Linting */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
