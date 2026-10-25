@@ -589,7 +589,6 @@ uploaded ──► queued ──► processing ──► completed
 | `processing_jobs`, `job_documents` | jobs and per-document job status |
 | `extractions`, `extracted_images` | where the extracted text/images are in Silo, plus stats |
 | `chunks` | links each chunk to its Qdrant point |
-| `langgraph.*` | LangGraph checkpoints (for the future QA pipeline) |
 
 **Silo** (bucket `MINIO_BUCKET`, default `synthetic-data`) — everything for a project sits under one folder, so deleting a project removes it all:
 ```
