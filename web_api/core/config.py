@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     # ---------- Database ----------
     DATABASE_URL: str                          # synth_app (runtime, data only)
-    MIGRATION_DATABASE_URL: str | None = None  # synth_owner (Alembic, LangGraph setup)
+    MIGRATION_DATABASE_URL: str | None = None  # synth_owner (Alembic migrations)
     TEST_DATABASE_URL: str | None = None
     TEST_MIGRATION_DATABASE_URL: str | None = None
     DB_ECHO: bool = False

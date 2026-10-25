@@ -23,13 +23,13 @@ A plain-language guide to the `web_api`: what each endpoint does, what to send, 
 
 ```
  You / front-end ──HTTP──►  web_api (FastAPI)  ──►  PostgreSQL   users, projects, documents, jobs...
-                               │    ▲           ──►  MinIO        the actual files + extracted text
+                               │    ▲           ──►  Silo         the actual files + extracted text
                      puts a    │    │ worker calls back
                      task on   ▼    │ (/internal, /webhooks)
                              Redis ──► Celery worker ──► Qdrant (vectors for search)
 ```
 
-- **web_api** is the only thing that touches PostgreSQL and MinIO.
+- **web_api** is the only thing that touches PostgreSQL and Silo.
 - **Workers** do the heavy work (read PDFs, chunk, embed). They never touch the database directly — they *ask* the API for files and *tell* the API when they're done, using a shared secret (`X-Internal-Token`).
 - **Redis** is just the queue between the API and the workers.
 
@@ -234,7 +234,7 @@ Errors: `401 invalid_credentials` (same error for unknown email and wrong passwo
 → Project. Errors: `409` if you change `data_type` after documents were uploaded.
 
 #### `DELETE /projects/{project_id}`
-**Owner.** → `204`. Deletes **everything** of the project: members, documents, model config, jobs, chunks (database cascades), and all its files in MinIO.
+**Owner.** → `204`. Deletes **everything** of the project: members, documents, model config, jobs, chunks (database cascades), and all its files in Silo.
 
 ---
 
@@ -288,7 +288,7 @@ Errors: `400 unsupported_file_type`, `413 file_too_large`, `422` (no files / emp
 **Member.** List, oldest first.
 
 #### `GET /documents/{document_id}` · `DELETE /documents/{document_id}`
-**Member.** Get one / delete one (`204`, also removes the file from MinIO and its vectors from Qdrant).
+**Member.** Get one / delete one (`204`, also removes the file from Silo and its vectors from Qdrant).
 
 ---
 
@@ -470,7 +470,7 @@ Errors: `404 document_not_found` (id not in this project), `409` a document is a
 ```
 
 #### `GET /documents/{document_id}/extraction`
-**Member.** The same summary fields as above, **plus the text** (loaded from MinIO):
+**Member.** The same summary fields as above, **plus the text** (loaded from Silo):
 ```json
 {
   "document_id": "uuid", "char_count": 18250, "image_count": 1, "metadata": {}, "created_at": "...",
@@ -587,11 +587,10 @@ uploaded ──► queued ──► processing ──► completed
 | `credential_models` | models registered on Ollama / Azure connections |
 | `project_stage_models` | model config: stage → credential + model (+ measured embedding size) |
 | `processing_jobs`, `job_documents` | jobs and per-document job status |
-| `extractions`, `extracted_images` | where the extracted text/images are in MinIO, plus stats |
+| `extractions`, `extracted_images` | where the extracted text/images are in Silo, plus stats |
 | `chunks` | links each chunk to its Qdrant point |
-| `langgraph.*` | LangGraph checkpoints (for the future QA pipeline) |
 
-**MinIO** (bucket `MINIO_BUCKET`, default `synthetic-data`) — everything for a project sits under one folder, so deleting a project removes it all:
+**Silo** (bucket `MINIO_BUCKET`, default `synthetic-data`) — everything for a project sits under one folder, so deleting a project removes it all:
 ```
 projects/{project_id}/documents/{document_id}.pdf
 projects/{project_id}/extracted/{document_id}/text.txt        fiction

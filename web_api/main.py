@@ -7,7 +7,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from web_api.core.config import get_settings
-from web_api.db.checkpointer import open_checkpointer
 from web_api.db.session import dispose_engine
 from web_api.errors import register_error_handlers
 from web_api.routers.CredentialRouter import router as credential_router
@@ -44,12 +43,9 @@ async def lifespan(app: FastAPI):
     app.state.jwt_service = JWTService(settings)
     app.state.email_service = EmailService(settings)
     await minio_service.ensure_bucket()
-    # LangGraph checkpointer (tables created by web_api.scripts.setup_checkpointer)
-    checkpoint_pool, app.state.checkpointer = await open_checkpointer(settings.DATABASE_URL)
     try:
         yield
     finally:
-        await checkpoint_pool.close()
         await dispose_engine()
 
 

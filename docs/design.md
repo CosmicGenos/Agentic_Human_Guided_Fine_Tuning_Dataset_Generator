@@ -35,8 +35,8 @@ The result is a clean, exportable fine-tuning dataset in standard formats (Chat,
 
 - **Human-guided, not human-replaced** — humans define how agents behave, set quality thresholds, and review borderline cases
 - **Domain-aware** — separate processing strategies for fiction and academic documents
-- **Scalable by design** — heavy processing is distributed (Celery); agentic orchestration is async (LangGraph)
-- **Resumable** — all long-running jobs support pause and resume via checkpointing
+- **Scalable by design** — heavy processing is distributed (Celery); QA generation runs on a Postgres task queue drained by async runners
+- **Resumable** — all long-running jobs support pause and resume; QA work is stored as task rows, so a restart just picks up the rows left
 - **Auditable** — every QA pair traces back to its source chunk, retrieval context, validation score, and reviewer
 
 ---
@@ -57,29 +57,29 @@ The result is a clean, exportable fine-tuning dataset in standard formats (Chat,
 │           QA Jobs, Skills, Human Review,                        │
 │           Dataset Export, Webhooks, Internal                    │
 │                                                                  │
-│  LangGraph QA Pipeline (async background tasks)                 │
+│  QA jobs: the API writes tasks to Postgres                      │
 └────────┬──────────────────────────────────────┬─────────────────┘
-         │ Celery tasks                          │ Async graph
+         │ Celery tasks                          │ Postgres task queue
          ▼                                       ▼
 ┌────────────────────┐                ┌──────────────────────────┐
-│   Celery Workers   │                │   LangGraph QA Graph     │
+│   Celery Workers   │                │   QA Runners (asyncio)   │
 │                    │                │                          │
-│  Document ingest   │                │  chunk → question_gen    │
-│  PDF extraction    │                │  → answer_gen → validate │
-│  Chunking          │                │  → route → human/accept/ │
-│  Embedding         │                │  reject                  │
-│  Qdrant storage    │                │                          │
+│  Document ingest   │                │  chunk → questions       │
+│  PDF extraction    │                │  → answer → validate     │
+│  Chunking          │                │  → accept / review /     │
+│  Embedding         │                │    reject                │
+│  Qdrant storage    │                │  per-lane rate limits    │
 └────────┬───────────┘                └──────────┬───────────────┘
          │                                       │
          ▼                                       ▼
 ┌────────────────────────────────────────────────────────────────┐
 │                    Data Layer                                   │
 │                                                                  │
-│   PostgreSQL        MinIO            Qdrant         Redis       │
+│   PostgreSQL        Silo             Qdrant         Redis       │
 │   (users, projects, (uploads,        (dense +       (Celery     │
 │    jobs, QA pairs,   extracted text,  sparse         broker)    │
-│    LangGraph         images)          vectors)                  │
-│    checkpoints)                                                 │
+│    QA tasks          images)          vectors)                  │
+│    queue)                                                       │
 └────────────────────────────────────────────────────────────────┘
          │
          ▼
@@ -98,9 +98,9 @@ The result is a clean, exportable fine-tuning dataset in standard formats (Chat,
 | Phase | Purpose | Orchestration |
 |---|---|---|
 | Phase 1: Document Processing | Ingest, extract, chunk, embed, store | Celery (heavy, blocking tasks) |
-| Phase 2: QA Generation | Generate, retrieve, validate, review, export | LangGraph (agentic, async LLM calls) |
+| Phase 2: QA Generation | Generate, retrieve, validate, review, export | Postgres task queue + async runners (many small LLM calls) |
 
-Redis is only the Celery broker. PostgreSQL holds all application state and the LangGraph checkpoints (in a separate `langgraph` schema). MinIO holds files: uploads, extracted text/markdown, and extracted images.
+Redis is the Celery broker (and, for QA generation, will hold the shared per-lane rate limiters). PostgreSQL holds all application state, including the QA task queue. Silo holds files: uploads, extracted text/markdown, and extracted images.
 
 ### 2.3 Provider & Credential System
 
@@ -116,7 +116,7 @@ Every LLM call in the platform — contextualization, embedding, question genera
 
 **Worker access to keys:** Celery tasks carry only IDs. The worker fetches the project's models and keys from an internal endpoint once per job and keeps them in memory, so keys never sit in Redis.
 
-**Workers:** When a Celery task is dispatched, the web API fetches and decrypts the relevant credentials and passes them in the task payload. Workers use the passed credentials, falling back to environment variables if none are provided. Workers never talk to PostgreSQL or MinIO directly: they fetch files and report results through web API `/internal/*` and `/webhooks/*` routes, authenticated with a shared `X-Internal-Token`.
+**Workers:** When a Celery task is dispatched, the web API fetches and decrypts the relevant credentials and passes them in the task payload. Workers use the passed credentials, falling back to environment variables if none are provided. Workers never talk to PostgreSQL or Silo directly: they fetch files and report results through web API `/internal/*` and `/webhooks/*` routes, authenticated with a shared `X-Internal-Token`.
 
 ---
 
@@ -138,7 +138,7 @@ PDF Upload
     ↓
 PyMuPDF → raw text extraction
     ↓
-Stored → MinIO (text) + PostgreSQL `extractions` row (key + stats)
+Stored → Silo (text) + PostgreSQL `extractions` row (key + stats)
     ↓
 Chonkie hierarchical chunking
     ├─ Parent chunks: 30,000 tokens, 5,000 overlap
@@ -175,10 +175,10 @@ Image replacement in markdown
     ├─ Before: ![alt](image.png)
     └─ After: **[IMAGE: alt]**\n{description}\n
     ↓
-Stored → MinIO + PostgreSQL
-    └─ text.md (original markdown)       → MinIO
-    └─ enriched.md (image descriptions)  → MinIO
-    └─ images                            → MinIO
+Stored → Silo + PostgreSQL
+    └─ text.md (original markdown)       → Silo 
+    └─ enriched.md (image descriptions)  → Silo 
+    └─ images                            → Silo 
     └─ keys, stats, image descriptions   → `extractions` / `extracted_images` rows
     ↓
 Smart markdown-aware chunking
@@ -248,24 +248,26 @@ Point:
 
 ## 4. Phase 2 — QA Generation Pipeline
 
-### 4.1 Design Decision: LangGraph over Celery
+> **Being rewritten.** QA generation will **not** use LangGraph (decided 2026-10-24; the unused checkpointer was removed). §4.1 records the decision. §4.3, §4.7, §4.8 and the `interrupt()` flow in §5 still describe the old LangGraph design and will be replaced by the task-queue design: task rows in Postgres, per-lane (account + model) rate limits, fair turns between jobs, and cache-aware chunk batches. The agents, prompts, scoring thresholds, statuses and export formats stay as described.
+
+### 4.1 Design Decision: a Postgres task queue, not LangGraph or Celery
 
 QA generation is fundamentally different from document processing:
 
 | Document Processing | QA Generation |
 |---|---|
 | Few heavy blocking tasks (Marker takes minutes) | Many small async LLM calls (seconds each) |
-| CPU/IO bound | Network bound (API calls) |
-| Needs worker isolation | Can run as async background tasks in web_api |
-| Simple linear pipeline | Stateful graph with branching and human interrupts |
+| CPU/IO bound | Network bound (API calls), limited by provider rate limits |
+| Needs worker isolation | Hundreds of calls can wait together in one asyncio process |
 | No human-in-the-loop | Human review is a core part of the flow |
 
-LangGraph is used for QA generation because:
-- Built-in `interrupt()` for human-in-the-loop (the human review queue)
-- Built-in checkpointing to PostgreSQL (`AsyncPostgresSaver`, same database) — enables pause/resume
-- Conditional edges map directly to the score-based routing logic
-- `Send` API enables fan-out to process hundreds of QA chunks in parallel
-- State machine is the natural model for the QA pair lifecycle
+Each QA pair moves along a straight line (questions → answer → validate → route), and its status already lives in `qa_pairs`. So the pipeline is a **queue of small tasks in Postgres**, drained by async runner processes:
+
+- **Human review never blocks a job.** "Needs review" is an ordinary end state stored in Postgres. With LangGraph, one `interrupt()` in a fanned-out graph stops the whole job until a human answers.
+- **Control over LLM calls.** Every call goes through one gateway with rate limits per lane (account + model), shared across runners, and a budget per job. Pause and cancel take effect at once: runners stop claiming the job's tasks.
+- **Fair sharing.** Jobs that share a key take turns, so one large job can't starve the others.
+- **Crash-safe without checkpoints.** A task and its result change in one transaction, and a lease makes a crashed runner's tasks claimable again.
+- **Why not Celery:** its tasks are synchronous (one process per in-flight call), its queues are first in, first out, and its rate limits are per worker, not per API key.
 
 Celery remains exclusively for document processing (Phase 1).
 
@@ -279,22 +281,22 @@ Before question generation begins, documents are re-chunked with different param
 | Overlap | 5,000 tokens (parent) | None |
 | Purpose | Semantic search target | Question generation input |
 | Storage | Qdrant (permanent) | PostgreSQL `qa_chunks` (temporary) |
-| Source | Original PDF | Extracted text already in MinIO |
+| Source | Original PDF | Extracted text already in Silo |
 
 **Why 60,000 tokens?** Standard LLM context windows are ~128k tokens. Half is reserved for the prompt template, generated questions, and system instructions. 60k tokens is dense enough to generate multiple diverse questions while staying within context limits.
 
 **Source for academic documents**: `enriched_markdown` (with image descriptions inlined) — not `markdown_text`. This gives the question generator awareness of visual content.
 
-No re-processing of PDFs. Content is read directly from the extracted text in MinIO (located via the `extractions` table).
+No re-processing of PDFs. Content is read directly from the extracted text in Silo (located via the `extractions` table).
 
-### 4.3 LangGraph Graph Structure
+### 4.3 LangGraph Graph Structure (superseded, see §4 note)
 
 ```
                     ┌─────────────┐
                     │  chunk_node │
                     │             │
                     │ Fetch from  │
-                    │ MinIO,      │
+                    │ Silo ,      │
                     │ rechunk to  │
                     │ 60k tokens  │
                     └──────┬──────┘
@@ -395,7 +397,7 @@ Each agent has a dedicated system prompt configured per project before any job r
 
 Before a QA job can start, the project owner must configure and approve a Skill Config. This is a set of system prompts that defines how each agent behaves for this specific project.
 
-**The meta-agent** — a separate LLM interaction (not a Celery task, not a LangGraph node) that lives in `web_api` as a service. The project owner describes what they want in plain language. The meta-agent drafts system prompts for all three agents. The owner reviews, edits, and iterates until satisfied, then explicitly approves.
+**The meta-agent** — a separate LLM interaction (not a Celery task, not a queued QA task) that lives in `web_api` as a service. The project owner describes what they want in plain language. The meta-agent drafts system prompts for all three agents. The owner reviews, edits, and iterates until satisfied, then explicitly approves.
 
 Approval locks the skill config and unlocks job creation.
 
@@ -441,7 +443,7 @@ Stored on QAPairModel:
     └─ retrieval_scores: List[float]    (post-rerank scores)
 ```
 
-### 4.7 Checkpointing and Pause/Resume
+### 4.7 Checkpointing and Pause/Resume (superseded, see §4 note)
 
 LangGraph persists graph state to PostgreSQL on every node transition using an `AsyncPostgresSaver` checkpointer (tables in the `langgraph` schema, created by `web_api.scripts.setup_checkpointer`; available at runtime as `app.state.checkpointer`). Each job is identified by a unique `thread_id` (the `job_id`).
 
@@ -468,7 +470,7 @@ async def answer_gen_node(state):
 
 ### 5.1 The Human Review Queue
 
-When a QA pair scores 5–8, the LangGraph graph pauses via `interrupt()` and the pair enters `PENDING_HUMAN_REVIEW` status. The web API exposes endpoints for workers and project owners to act on these pairs.
+When a QA pair scores 5–8, it is saved with status `PENDING_HUMAN_REVIEW` and the job carries on with other pairs (nothing waits for the reviewer). The web API exposes endpoints for workers and project owners to act on these pairs.
 
 ```
 GET /qa-pairs/review/{project_id}
@@ -559,7 +561,7 @@ A user can simultaneously be a Project Owner of one project and a Worker in anot
 
 ## 7. Data Models
 
-PostgreSQL tables via SQLAlchemy 2 (async) with Alembic migrations — see `web_api/db/models/` for the source of truth. All ids are UUIDs; all timestamps are `TIMESTAMPTZ`; enums are stored as text with a CHECK constraint. Large content (files, extracted text) lives in MinIO; tables store the object keys.
+PostgreSQL tables via SQLAlchemy 2 (async) with Alembic migrations — see `web_api/db/models/` for the source of truth. All ids are UUIDs; all timestamps are `TIMESTAMPTZ`; enums are stored as text with a CHECK constraint. Large content (files, extracted text) lives in Silo; tables store the object keys.
 
 ### 7.1 Implemented Tables
 
@@ -599,7 +601,7 @@ The creator is added as `owner` in the same transaction; a project always keeps 
 #### `documents`
 ```
 project_id:     → projects (cascade)
-original_name, storage_key (MinIO, unique), file_type (pdf | images),
+original_name, storage_key (Silo, unique), file_type (pdf | images),
 content_type, size_bytes
 status:         uploaded | queued | processing | completed | failed
 error, uploaded_by, processed_at
@@ -813,7 +815,7 @@ POST   /projects                            Create (caller becomes owner)
 GET    /projects                            Projects I'm a member of (admin: all)
 GET    /projects/{id}
 PATCH  /projects/{id}                       Owner
-DELETE /projects/{id}                       Owner — cascades documents, config, MinIO files
+DELETE /projects/{id}                       Owner — cascades documents, config, Silo files
 
 GET    /projects/{id}/members
 POST   /projects/{id}/members               Add by email (owner)
@@ -858,9 +860,9 @@ POST   /qa-jobs/                           Create QA job
                                            Body: { project_id, skill_config_id,
                                                    questions_per_chunk, question_types }
 
-POST   /qa-jobs/{id}/start                 Start processing (triggers LangGraph graph)
-POST   /qa-jobs/{id}/pause                 Checkpoint and pause
-POST   /qa-jobs/{id}/resume                Resume from checkpoint
+POST   /qa-jobs/{id}/start                 Start processing (queues the job's first tasks)
+POST   /qa-jobs/{id}/pause                 Runners stop claiming the job's tasks
+POST   /qa-jobs/{id}/resume                Runners claim its remaining tasks again
 
 GET    /qa-jobs/{id}                       Job status + progress counters
 GET    /qa-jobs/project/{project_id}       List all jobs for project
@@ -940,11 +942,10 @@ POST   /webhooks/processing-failed         Marks the document failed with the st
 | Database | PostgreSQL 17 (Docker) | All application state |
 | ORM / driver | SQLAlchemy 2 (async) + psycopg 3 | Typed models, async access |
 | Migrations | Alembic | Versioned schema changes |
-| Object storage | MinIO | Uploads, extracted text, extracted images |
+| Object storage | Silo | Uploads, extracted text, extracted images |
 | Task queue | Celery | Document processing (Phase 1) |
 | Message broker | Redis 7 | Celery broker |
-| QA orchestration | LangGraph | Agentic QA pipeline (Phase 2) |
-| Graph checkpointing | PostgreSQL (`langgraph-checkpoint-postgres`) | Pause/resume state |
+| QA orchestration | Postgres task queue + asyncio runners | QA pipeline (Phase 2), planned |
 | Vector database | Qdrant | Dense + sparse vector search |
 | PDF text extraction | PyMuPDF | Fiction documents |
 | PDF → Markdown | Marker CLI | Academic documents |
@@ -964,10 +965,10 @@ POST   /webhooks/processing-failed         Marks the document failed with the st
 
 ```yaml
 services:
-  postgres:   # 127.0.0.1:5433 — app DB + LangGraph checkpoints (roles: synth_owner, synth_app)
+  postgres:   # 127.0.0.1:5433 — app DB + QA task queue (roles: synth_owner, synth_app)
   redis:      # port 6379 — Celery broker
   qdrant:     # port 6333 — vector database
-  minio:      # ports 9000 (API) / 9001 (console) — object storage
+  silo:       # ports 9000 (S3 API) / 9001 (console) — object storage (maintained MinIO fork)
   flower:     # port 5555 — Celery monitoring
 ```
 
@@ -979,15 +980,15 @@ Two database roles: `synth_owner` owns the schema and runs migrations; `synth_ap
 ├── web_api/                 FastAPI service (own uv project)
 │   ├── main.py              app, lifespan, router registration
 │   ├── core/                settings (pydantic-settings), Celery client
-│   ├── db/                  SQLAlchemy base, session, models/, LangGraph checkpointer
+│   ├── db/                  SQLAlchemy base, session, models/
 │   ├── alembic/             migrations
 │   ├── data_models/         Pydantic request/response schemas + enums
 │   ├── deps/                auth, project access, internal-token guard
 │   ├── routers/             HTTP layer
 │   ├── services/            business logic
-│   ├── scripts/             create_admin, setup_checkpointer
-│   ├── tests/               pytest (test database, faked email/MinIO/Celery)
-│   └── qa_pipeline/         LangGraph graph, nodes, state               [PLANNED]
+│   ├── scripts/             create_admin
+│   ├── tests/               pytest (test database, faked email/storage/Celery)
+│   └── qa_pipeline/         task queue, runners, LLM gateway            [PLANNED]
 │
 ├── workers/                 Celery document processing (own uv project)
 │   ├── tasks/               orchestrator, fiction_processor, academic_processor
