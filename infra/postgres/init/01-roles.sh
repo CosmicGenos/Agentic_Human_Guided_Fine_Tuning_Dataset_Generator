@@ -2,7 +2,7 @@
 # Runs once, on first init of an empty postgres_data volume.
 # The image has already created $POSTGRES_DB (synthetic_data) before this runs.
 #
-#   synth_owner - owns the schemas; used by Alembic migrations and LangGraph setup
+#   synth_owner - owns the schema; used by Alembic migrations
 #   synth_app   - runtime role for the API; data read/write only, no DDL
 set -euo pipefail
 
@@ -28,13 +28,10 @@ ALTER SCHEMA public OWNER TO synth_owner;
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO synth_app;
 
-CREATE SCHEMA IF NOT EXISTS langgraph AUTHORIZATION synth_owner;
-GRANT USAGE ON SCHEMA langgraph TO synth_app;
-
--- anything synth_owner creates later (Alembic, LangGraph setup) is auto-granted to the app
-ALTER DEFAULT PRIVILEGES FOR ROLE synth_owner IN SCHEMA public, langgraph
+-- anything synth_owner creates later (Alembic) is auto-granted to the app
+ALTER DEFAULT PRIVILEGES FOR ROLE synth_owner IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO synth_app;
-ALTER DEFAULT PRIVILEGES FOR ROLE synth_owner IN SCHEMA public, langgraph
+ALTER DEFAULT PRIVILEGES FOR ROLE synth_owner IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO synth_app;
 SQL
 done
