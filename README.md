@@ -29,13 +29,13 @@ Luman turns your PDFs into **question–answer datasets for fine-tuning LLMs**. 
 | Document upload, processing jobs, status tracking | ✅ Done |
 | Provider credentials + model choice for each step (OpenAI, Anthropic, Google, Cohere, Ollama, ...) | ✅ Done |
 | Text extraction, chunking, embeddings, Qdrant storage (workers) | 🟡 Works, known bugs being fixed |
-| QA generation pipeline (LangGraph) | ⏳ Planned |
+| QA generation pipeline (Postgres task queue + async runners) | ⏳ Planned |
 | Human review queue, dataset export | ⏳ Planned |
 | Web UI | 🟡 Early |
 
 ## Tech stack
 
-**API:** FastAPI · PostgreSQL (SQLAlchemy async, Alembic) · Silo (S3 storage, a maintained MinIO fork) · LangGraph
+**API:** FastAPI · PostgreSQL (SQLAlchemy async, Alembic) · Silo (S3 storage, a maintained MinIO fork)
 **Processing:** Celery + Redis · PyMuPDF · Marker · Chonkie · Qdrant (dense + BM25)
 **UI:** React + Vite
 
@@ -56,7 +56,6 @@ copy .env.example .env                    # fill in the secrets
 docker compose up -d                      # postgres, redis, qdrant, silo, flower
 uv sync --project web_api
 cd web_api ; uv run alembic upgrade head ; uv run alembic -x db=test upgrade head ; cd ..
-uv run --project web_api python -m web_api.scripts.setup_checkpointer
 uv run --project web_api python -m web_api.scripts.create_admin --email you@example.com --username admin
 uv run --project web_api uvicorn web_api.main:app --reload --port 8000 --loop asyncio:SelectorEventLoop
 ```
