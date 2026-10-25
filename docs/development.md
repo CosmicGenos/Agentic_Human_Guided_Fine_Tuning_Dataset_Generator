@@ -23,9 +23,8 @@ docker compose ps         # wait until every service shows (healthy)
 #    Postgres roles (synth_owner / synth_app) are created on the FIRST start only,
 #    from infra/postgres/init/01-roles.sh, using the passwords in .env.
 
-# 4. Database schema, LangGraph checkpoint tables, first admin
+# 4. Database schema (main + test database), first admin
 cd web_api ; uv run alembic upgrade head ; uv run alembic -x db=test upgrade head ; cd ..
-uv run --project web_api python -m web_api.scripts.setup_checkpointer
 uv run --project web_api python -m web_api.scripts.create_admin --email you@example.com --username admin
 ```
 
@@ -81,7 +80,7 @@ docker compose down -v
 All settings live in the repo-root `.env`, which both services read. `.env.example` lists every key.
 
 - **Database URLs:** use `127.0.0.1`, not `localhost`. On Windows, `localhost` tries IPv6 first, which adds about 2 minutes to every connection.
-- **Two database roles:** `DATABASE_URL` uses `synth_app`, which can only read and write data. `MIGRATION_DATABASE_URL` uses `synth_owner`, for Alembic and checkpointer setup.
+- **Two database roles:** `DATABASE_URL` uses `synth_app`, which can only read and write data. `MIGRATION_DATABASE_URL` uses `synth_owner`, for Alembic migrations.
 - **`INTERNAL_API_TOKEN`:** must be the same for the API and the workers.
 - **Email:** if `RESEND_API_KEY` or `FROM_EMAIL` is unset, invite links are written to the API log instead of being emailed.
 - **LLM provider keys** are not environment variables. Admins add them in the app (Credentials); the worker fetches them per job from web_api. Marker (academic PDFs) uses the project's vision model; `GEMINI_API_KEY` in `.env` is only its fallback.
@@ -96,6 +95,7 @@ All settings live in the repo-root `.env`, which both services read. `.env.examp
 | `Psycopg cannot use the 'ProactorEventLoop'` | Start uvicorn with `--loop asyncio:SelectorEventLoop` |
 | Every DB call takes ~2 minutes | Use `127.0.0.1` instead of `localhost` in the DB URLs |
 | Postgres password authentication failed | `.env` passwords changed after the first start. Run `ALTER ROLE ... PASSWORD`, or (dev only) `docker compose down -v` to re-run init |
+| `/docs` shows plain-text `Not found` although uvicorn started | Another program owns port 8000 (Windows still lets uvicorn bind it). FastAPI's 404 is JSON. Find the owner with `netstat -ano \| findstr :8000`; `wslrelay.exe` means something inside WSL (e.g. a Portainer container). Stop it, or run the API on another port and set `WEB_API_URL` / `VITE_API_URL` to match |
 | `The token '&&' is not a valid statement separator` | Windows PowerShell 5.1: use `;` instead of `&&` |
 | API startup hangs, then warns `MinIO bucket init failed` | Silo isn't running: `docker compose up -d silo` |
 | Celery hangs on tasks | Missing `--pool=solo` (Windows) |
